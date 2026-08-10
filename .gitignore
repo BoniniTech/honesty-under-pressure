@@ -1,0 +1,30 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# uv / venv
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Eval run artifacts — keep summaries, gitignore raw logs
+runs/*
+!runs/.gitkeep
+!runs/summaries/
+!runs/summaries/**
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
