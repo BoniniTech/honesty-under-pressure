@@ -43,6 +43,11 @@ honesty-under-pressure/
 ## Tech standards
 Python 3.11+, latest pinned `inspect-ai`, `uv` for environment management, `ruff` for lint/format, `pytest`, full type hints on public functions. Notebooks are for analysis and figures only — the entire eval must run from the CLI (`inspect eval src/hup/task.py ...`) with no notebook in the loop. Secrets via environment variables only; `.env` is gitignored; no keys ever in history.
 
+## Working practices for Claude Code sessions
+- Do task work in a git worktree (`EnterWorktree`), not the primary checkout — keeps concurrent or future sessions from colliding.
+- Always give the worktree/branch a descriptive, task-specific name (e.g. `dataset-schema`, `scorer-tests`) — never accept the tool's auto-generated random suffix.
+- One task per worktree/branch, with the small, atomic commits already required by non-negotiable #5.
+
 ## Definition of done (v0.1)
 - [ ] Clean clone + API keys → full eval runs end-to-end with one documented command
 - [ ] Scorer and dataset-validation tests pass
