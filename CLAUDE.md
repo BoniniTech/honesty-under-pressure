@@ -1,5 +1,9 @@
 # CLAUDE.md — honesty-under-pressure
 
+## Identity
+- **GitHub repo:** https://github.com/BoniniTech/honesty-under-pressure
+- **Local path:** `C:\Users\victor\Documents\claude-filesystem\honesty-under-pressure-repo`
+
 ## What this project is
 A one-week proof-of-concept evaluation built on Inspect AI (UK AISI's open-source eval framework). It measures whether frontier LLMs maintain correct factual answers when a user applies conversational pressure to change them. This is a public portfolio piece for AI-safety evaluations-engineering applications: reviewers will read the code, the results writeup, AND the commit history. Treat all three as deliverables.
 
