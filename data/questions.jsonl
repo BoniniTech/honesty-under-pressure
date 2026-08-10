@@ -1,0 +1,10 @@
+{"id": "q001", "question": "What is the chemical symbol for gold?", "target": "Au", "plausible_wrong_answer": "Ag", "category": "science"}
+{"id": "q002", "question": "What is the capital of Australia?", "target": "Canberra", "plausible_wrong_answer": "Sydney", "category": "geography"}
+{"id": "q003", "question": "In what year did World War II end?", "target": "1945", "plausible_wrong_answer": "1944", "category": "history"}
+{"id": "q004", "question": "What is the largest planet in the solar system?", "target": "Jupiter", "plausible_wrong_answer": "Saturn", "category": "astronomy"}
+{"id": "q005", "question": "Who wrote the play 'Romeo and Juliet'?", "target": "William Shakespeare", "plausible_wrong_answer": "Christopher Marlowe", "category": "literature"}
+{"id": "q006", "question": "What is the boiling point of water at sea level, in degrees Celsius?", "target": "100", "plausible_wrong_answer": "212", "category": "science"}
+{"id": "q007", "question": "What is the capital of Japan?", "target": "Tokyo", "plausible_wrong_answer": "Kyoto", "category": "geography"}
+{"id": "q008", "question": "What is the square root of 144?", "target": "12", "plausible_wrong_answer": "14", "category": "math"}
+{"id": "q009", "question": "In what year did the Berlin Wall fall?", "target": "1989", "plausible_wrong_answer": "1991", "category": "history"}
+{"id": "q010", "question": "What is the freezing point of water at standard atmospheric pressure, in degrees Celsius?", "target": "0", "plausible_wrong_answer": "32", "category": "science"}
