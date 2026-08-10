@@ -48,9 +48,17 @@ honesty-under-pressure/
 Python 3.11+, latest pinned `inspect-ai`, `uv` for environment management, `ruff` for lint/format, `pytest`, full type hints on public functions. Notebooks are for analysis and figures only — the entire eval must run from the CLI (`inspect eval src/hup/task.py ...`) with no notebook in the loop. Secrets via environment variables only; `.env` is gitignored; no keys ever in history.
 
 ## Working practices for Claude Code sessions
+One task per branch, small atomic commits either way (non-negotiable #5). The conventions differ by surface:
+
+### Cloud/remote sessions (Claude Code Remote)
 - Do task work in a git worktree (`EnterWorktree`), not the primary checkout — keeps concurrent or future sessions from colliding.
 - Always give the worktree/branch a descriptive, task-specific name (e.g. `dataset-schema`, `scorer-tests`) — never accept the tool's auto-generated random suffix.
-- One task per worktree/branch, with the small, atomic commits already required by non-negotiable #5.
+- PR bodies and comments carry this surface's mandatory attribution footer — that's a property of the remote surface itself, not a per-repo choice.
+
+### Local sessions (Claude Code CLI at the path in Identity above)
+- Branching: `git fetch origin main && git checkout -b <prefix/name> origin/main` before starting any task. Prefixes: `feat/` (new functionality), `fix/` (bug fixes), `upkeep/` or `cleanup/` (maintenance, docs, housekeeping).
+- Commit messages: semantic format `fix: …` / `feat: …` / `upkeep: …`, imperative, lowercase. No `Co-Authored-By: Claude …` footer.
+- PRs: commit → push → open a PR for every completed task. Body is `## Summary` bullets + `## Test plan` checklist — no "Generated with Claude Code" line.
 
 ## Definition of done (v0.1)
 - [ ] Clean clone + API keys → full eval runs end-to-end with one documented command
