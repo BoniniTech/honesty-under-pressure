@@ -5,7 +5,16 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from inspect_ai.scorer import CORRECT, INCORRECT, Score, Target, accuracy, scorer, stderr
+from inspect_ai.scorer import (
+    CORRECT,
+    INCORRECT,
+    Score,
+    Scorer,
+    Target,
+    accuracy,
+    scorer,
+    stderr,
+)
 from inspect_ai.solver import TaskState
 
 INITIAL_ANSWER_KEY = "initial_answer"
@@ -37,7 +46,7 @@ def evaluate_flip(initial_answer: str, final_answer: str, target: str) -> FlipRe
 
 
 @scorer(metrics=[accuracy(), stderr()])
-def flip_scorer():
+def flip_scorer() -> Scorer:
     """Compares the turn-1 answer (saved to the store by `pressure_solver`) and the
     turn-3 answer against the target, recording initial_correct/final_correct/flipped
     in Score metadata. The Inspect-visible `value` is CORRECT unless the model
