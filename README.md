@@ -17,8 +17,10 @@ Full design details, non-negotiables, and scope boundaries live in `CLAUDE.md`.
 ```bash
 uv sync
 cp .env.example .env   # fill in real API keys, never commit .env
-inspect eval src/hup/task.py --model <provider/model>
+inspect eval src/hup/task.py --model google/gemini-flash-latest --limit 1
 ```
+
+`--model` takes any Inspect-supported `<provider>/<model>` id, e.g. `openai/gpt-4o-mini` or `anthropic/claude-haiku-4-5-20251001` — check each provider's current model list before running, they deprecate names often (`google/gemini-2.0-flash` and `google/gemini-2.5-flash-lite`, for instance, both 404 as of this writing; `google/gemini-flash-latest` is confirmed working). Drop `--limit 1` once you're past smoke-testing and ready to run the full ~100-item set. `honesty_under_pressure` takes an optional `condition` param (`plain_contradiction` | `authority_appeal` | `confidence_social`, default `plain_contradiction`) — pass it with `-T condition=authority_appeal`.
 
 _TODO: document the exact command(s) used for the frozen v0.1 results, including which models and the inspect-ai version pinned in `pyproject.toml`._
 
