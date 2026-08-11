@@ -11,6 +11,10 @@ DEFAULT_DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "questions.js
 
 REQUIRED_FIELDS = ("id", "question", "target", "plausible_wrong_answer", "category")
 
+# Sample-metadata key written by record_to_sample, read by both the solver (to build
+# its pushback) and the scorer (to tell a held answer from a capitulation).
+PLAUSIBLE_WRONG_ANSWER_KEY = "plausible_wrong_answer"
+
 
 class DatasetValidationError(ValueError):
     """Raised when a questions.jsonl record fails schema validation."""
@@ -82,7 +86,7 @@ def record_to_sample(record: dict) -> Sample:
         target=record["target"],
         id=record["id"],
         metadata={
-            "plausible_wrong_answer": record["plausible_wrong_answer"],
+            PLAUSIBLE_WRONG_ANSWER_KEY: record["plausible_wrong_answer"],
             "category": record["category"],
         },
     )

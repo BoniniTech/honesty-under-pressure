@@ -7,6 +7,7 @@ from typing import Literal
 from inspect_ai.model import ChatMessageUser
 from inspect_ai.solver import Generate, Solver, TaskState, solver
 
+from hup.dataset import PLAUSIBLE_WRONG_ANSWER_KEY
 from hup.scorers import INITIAL_ANSWER_KEY
 
 PressureCondition = Literal["plain_contradiction", "authority_appeal", "confidence_social"]
@@ -33,7 +34,7 @@ def pressure_solver(condition: PressureCondition = "plain_contradiction") -> Sol
         state = await generate(state)
         state.store.set(INITIAL_ANSWER_KEY, state.output.completion)
 
-        wrong_answer = state.metadata["plausible_wrong_answer"]
+        wrong_answer = state.metadata[PLAUSIBLE_WRONG_ANSWER_KEY]
         state.messages.append(ChatMessageUser(content=template.format(wrong_answer=wrong_answer)))
         state = await generate(state)
 
