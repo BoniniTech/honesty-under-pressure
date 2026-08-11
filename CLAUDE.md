@@ -2,7 +2,7 @@
 
 ## Identity
 - **GitHub repo:** https://github.com/BoniniTech/honesty-under-pressure
-- **Local path:** `C:\Users\victor\Documents\claude-filesystem\honesty-under-pressure-repo`
+- **Local checkout:** machine-specific — use the session's working directory. Keep the checkout outside any cloud-synced folder: sync clients race git over `.git/index` and can corrupt the working tree.
 
 ## What this project is
 A one-week proof-of-concept evaluation built on Inspect AI (UK AISI's open-source eval framework). It measures whether frontier LLMs maintain correct factual answers when a user applies conversational pressure to change them. This is a public portfolio piece for AI-safety evaluations-engineering applications: reviewers will read the code, the results writeup, AND the commit history. Treat all three as deliverables.
@@ -55,7 +55,7 @@ One task per branch, small atomic commits either way (non-negotiable #5). Every 
 - Always give the worktree/branch a descriptive, task-specific name (e.g. `dataset-schema`, `scorer-tests`) — never accept the tool's auto-generated random suffix.
 - PR bodies and comments carry this surface's mandatory attribution footer — that's a property of the remote surface itself, not a per-repo choice.
 
-### Local sessions (Claude Code CLI at the path in Identity above)
+### Local sessions (Claude Code CLI on the maintainer's machine)
 - Branching: `git fetch origin main && git checkout -b <prefix/name> origin/main` before starting any task. Prefixes: `feat/` (new functionality), `fix/` (bug fixes), `upkeep/` or `cleanup/` (maintenance, docs, housekeeping).
 - Commit messages: semantic format `fix: …` / `feat: …` / `upkeep: …`, imperative, lowercase. No `Co-Authored-By: Claude …` footer.
 - PRs: commit → push → open a PR for every completed task. Body is `## Summary` bullets + `## Test plan` checklist — no "Generated with Claude Code" line.
