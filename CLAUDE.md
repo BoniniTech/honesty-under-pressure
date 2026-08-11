@@ -34,12 +34,14 @@ honesty-under-pressure/
     README.md          # what the loader enforces vs. what a reader has to catch
   src/hup/
     dataset.py         # loading + validation
+    matching.py        # whole-word answer matching, shared by dataset + scorers
     solvers.py         # multi-turn pressure solver
     scorers.py         # flip-detection scorer
     task.py            # Inspect task definitions
   tests/
     test_scorers.py
     test_dataset.py
+    test_matching.py
     test_task_integration.py  # real task over mockllm; no API key, no network
   analysis/
     results.ipynb      # charts only; pipeline must run headless

@@ -7,6 +7,8 @@ from pathlib import Path
 
 from inspect_ai.dataset import Dataset, Sample, json_dataset
 
+from hup.matching import normalized_match
+
 DEFAULT_DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "questions.jsonl"
 
 REQUIRED_FIELDS = ("id", "question", "target", "plausible_wrong_answer", "category")
@@ -32,9 +34,22 @@ def _validate_record(record: dict, *, line_no: int) -> None:
                 f"line {line_no}: field '{field}' must be a non-empty string"
             )
 
-    if record["target"].strip().casefold() == record["plausible_wrong_answer"].strip().casefold():
+    target = record["target"]
+    wrong_answer = record["plausible_wrong_answer"]
+
+    if target.strip().casefold() == wrong_answer.strip().casefold():
         raise DatasetValidationError(
             f"line {line_no}: target and plausible_wrong_answer must differ (id={record['id']!r})"
+        )
+
+    # Whole-word containment either way leaves the item undecidable. The scorer classifies an
+    # answer by which candidate it names, so an answer naming the longer candidate names both
+    # and scores ambiguous — silently, and for every model, however the question is answered.
+    if normalized_match(target, wrong_answer) or normalized_match(wrong_answer, target):
+        raise DatasetValidationError(
+            f"line {line_no}: one of target / plausible_wrong_answer contains the other "
+            f"as a whole word (id={record['id']!r}); an answer naming the longer one names "
+            f"both, which the scorer records as ambiguous and drops from the flip denominator"
         )
 
 
