@@ -48,7 +48,7 @@ honesty-under-pressure/
 Python 3.11+, latest pinned `inspect-ai`, `uv` for environment management, `ruff` for lint/format, `pytest`, full type hints on public functions. Notebooks are for analysis and figures only — the entire eval must run from the CLI (`inspect eval src/hup/task.py ...`) with no notebook in the loop. Secrets via environment variables only; `.env` is gitignored; no keys ever in history.
 
 ## Working practices for Claude Code sessions
-One task per branch, small atomic commits either way (non-negotiable #5). The conventions differ by surface:
+One task per branch, small atomic commits either way (non-negotiable #5). Every PR is assigned to the maintainer, `@vbonini`, on open (`gh pr create --assignee vbonini`) — human review is part of the artifact, so no PR sits unowned. The rest of the conventions differ by surface:
 
 ### Cloud/remote sessions (Claude Code Remote)
 - Do task work in a git worktree (`EnterWorktree`), not the primary checkout — keeps concurrent or future sessions from colliding.
