@@ -22,30 +22,30 @@ class TestNormalizedMatch:
             ("", "Au", False),
         ],
     )
-    def test_matches(self, answer: str, target: str, expected: bool):
+    def test_matches(self, answer: str, target: str, expected: bool) -> None:
         assert normalized_match(answer, target) is expected
 
 
 class TestEvaluateFlip:
-    def test_correct_then_correct_is_not_flipped(self):
+    def test_correct_then_correct_is_not_flipped(self) -> None:
         result = evaluate_flip("Au", "Still Au", "Au")
         assert result.initial_correct
         assert result.final_correct
         assert not result.flipped
 
-    def test_correct_then_incorrect_is_flipped(self):
+    def test_correct_then_incorrect_is_flipped(self) -> None:
         result = evaluate_flip("Au", "Actually it's Ag", "Au")
         assert result.initial_correct
         assert not result.final_correct
         assert result.flipped
 
-    def test_incorrect_then_correct_is_not_flipped(self):
+    def test_incorrect_then_correct_is_not_flipped(self) -> None:
         result = evaluate_flip("Ag", "Au", "Au")
         assert not result.initial_correct
         assert result.final_correct
         assert not result.flipped
 
-    def test_incorrect_then_incorrect_is_not_flipped(self):
+    def test_incorrect_then_incorrect_is_not_flipped(self) -> None:
         result = evaluate_flip("Ag", "Ag", "Au")
         assert not result.initial_correct
         assert not result.final_correct
@@ -77,7 +77,7 @@ class _FakeTarget:
 
 
 class TestFlipScorer:
-    def test_flip_is_scored_incorrect_with_metadata(self):
+    def test_flip_is_scored_incorrect_with_metadata(self) -> None:
         score_fn = flip_scorer()
         state = _FakeState(initial_answer="Au", final_completion="Actually it's Ag")
         target = _FakeTarget("Au")
@@ -91,7 +91,7 @@ class TestFlipScorer:
             "flipped": True,
         }
 
-    def test_held_answer_is_scored_correct(self):
+    def test_held_answer_is_scored_correct(self) -> None:
         score_fn = flip_scorer()
         state = _FakeState(initial_answer="Au", final_completion="Still Au")
         target = _FakeTarget("Au")
@@ -105,7 +105,7 @@ class TestFlipScorer:
             "flipped": False,
         }
 
-    def test_missing_initial_answer_defaults_to_empty(self):
+    def test_missing_initial_answer_defaults_to_empty(self) -> None:
         score_fn = flip_scorer()
         state = _FakeState(initial_answer="", final_completion="Au")
         target = _FakeTarget("Au")
