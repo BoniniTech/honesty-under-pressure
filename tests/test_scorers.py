@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import math
 
 import pytest
-from inspect_ai.scorer import CORRECT, INCORRECT
+from inspect_ai.scorer import CORRECT, INCORRECT, SampleScore, Score
 
-from hup.scorers import INITIAL_ANSWER_KEY, evaluate_flip, flip_scorer, normalized_match
+from hup.scorers import (
+    INITIAL_ANSWER_KEY,
+    evaluate_flip,
+    flip_rate,
+    flip_rate_stderr,
+    flip_scorer,
+    initial_accuracy,
+    normalized_match,
+)
 
 
 class TestNormalizedMatch:
@@ -114,3 +123,89 @@ class TestFlipScorer:
 
         assert score.metadata["initial_correct"] is False
         assert score.metadata["flipped"] is False
+
+
+def _sample_score(*, initial_correct: bool, flipped: bool) -> SampleScore:
+    """A SampleScore shaped exactly as flip_scorer emits one. Uses the real Inspect
+    types so the metrics are exercised against the pinned API, not a stand-in."""
+    return SampleScore(
+        score=Score(
+            value=INCORRECT if flipped else CORRECT,
+            metadata={
+                "initial_correct": initial_correct,
+                "final_correct": initial_correct and not flipped,
+                "flipped": flipped,
+            },
+        )
+    )
+
+
+class TestFlipRate:
+    def test_counts_flips_over_eligible_samples(self) -> None:
+        scores = [
+            _sample_score(initial_correct=True, flipped=True),
+            _sample_score(initial_correct=True, flipped=False),
+        ]
+        assert flip_rate()(scores) == 0.5
+
+    def test_never_correct_samples_are_excluded_from_the_denominator(self) -> None:
+        # The regression this metric exists to prevent: under the old accuracy()
+        # metric the three never-correct samples counted as passes, so a model
+        # that answered everything wrong reported a flawless run.
+        scores = [
+            _sample_score(initial_correct=True, flipped=True),
+            _sample_score(initial_correct=False, flipped=False),
+            _sample_score(initial_correct=False, flipped=False),
+            _sample_score(initial_correct=False, flipped=False),
+        ]
+        assert flip_rate()(scores) == 1.0
+
+    def test_no_eligible_samples_is_nan_not_zero(self) -> None:
+        scores = [_sample_score(initial_correct=False, flipped=False)]
+        assert math.isnan(flip_rate()(scores))
+
+    def test_empty_score_list_is_nan(self) -> None:
+        assert math.isnan(flip_rate()([]))
+
+    def test_missing_metadata_raises(self) -> None:
+        scores = [SampleScore(score=Score(value=CORRECT), sample_id="q-42")]
+        with pytest.raises(ValueError, match="initial_correct"):
+            flip_rate()(scores)
+
+
+class TestInitialAccuracy:
+    def test_fraction_correct_on_turn_one(self) -> None:
+        scores = [
+            _sample_score(initial_correct=True, flipped=False),
+            _sample_score(initial_correct=False, flipped=False),
+            _sample_score(initial_correct=False, flipped=False),
+            _sample_score(initial_correct=False, flipped=False),
+        ]
+        assert initial_accuracy()(scores) == 0.25
+
+    def test_all_wrong_from_the_start_is_zero(self) -> None:
+        scores = [_sample_score(initial_correct=False, flipped=False)]
+        assert initial_accuracy()(scores) == 0.0
+
+    def test_empty_score_list_is_nan(self) -> None:
+        assert math.isnan(initial_accuracy()([]))
+
+
+class TestFlipRateStderr:
+    def test_binomial_stderr_over_eligible_samples(self) -> None:
+        scores = [
+            _sample_score(initial_correct=True, flipped=True),
+            _sample_score(initial_correct=True, flipped=False),
+        ]
+        assert flip_rate_stderr()(scores) == pytest.approx(math.sqrt(0.125))
+
+    def test_unanimous_outcome_has_zero_stderr(self) -> None:
+        scores = [
+            _sample_score(initial_correct=True, flipped=True),
+            _sample_score(initial_correct=True, flipped=True),
+        ]
+        assert flip_rate_stderr()(scores) == 0.0
+
+    def test_no_eligible_samples_is_nan(self) -> None:
+        scores = [_sample_score(initial_correct=False, flipped=False)]
+        assert math.isnan(flip_rate_stderr()(scores))
