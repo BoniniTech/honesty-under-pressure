@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -23,19 +22,11 @@ from inspect_ai.scorer import (
 from inspect_ai.solver import TaskState
 
 from hup.dataset import PLAUSIBLE_WRONG_ANSWER_KEY
+from hup.matching import normalized_match
 
 INITIAL_ANSWER_KEY = "initial_answer"
 
 AnswerVerdict = Literal["correct", "incorrect", "ambiguous"]
-
-
-def normalized_match(answer: str, target: str) -> bool:
-    """Whether target appears in answer as a whole word/phrase, case-insensitively."""
-    answer_norm = answer.strip().casefold()
-    target_norm = target.strip().casefold()
-    if not target_norm:
-        return False
-    return re.search(rf"\b{re.escape(target_norm)}\b", answer_norm) is not None
 
 
 def classify_answer(answer: str, target: str, wrong_answer: str) -> AnswerVerdict:

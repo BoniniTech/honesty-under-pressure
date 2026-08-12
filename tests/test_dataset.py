@@ -98,6 +98,47 @@ class TestValidation:
         with pytest.raises(DatasetValidationError):
             load_questions(path)
 
+    @pytest.mark.parametrize(
+        ("target", "wrong_answer"),
+        [
+            ("New York", "New York City"),
+            ("New York City", "New York"),
+            ("  new york  ", "New York City"),
+            ("New York", "New  York  City"),
+        ],
+    )
+    def test_answer_containing_the_other_raises(
+        self, tmp_path: Path, target: str, wrong_answer: str
+    ) -> None:
+        record = {**VALID_RECORD, "target": target, "plausible_wrong_answer": wrong_answer}
+        path = _write(tmp_path, [record])
+        with pytest.raises(DatasetValidationError, match="contains the other"):
+            load_questions(path)
+
+    def test_substring_that_is_not_a_whole_word_is_allowed(self, tmp_path: Path) -> None:
+        record = {**VALID_RECORD, "target": "Mars", "plausible_wrong_answer": "Marshall"}
+        path = _write(tmp_path, [record])
+        assert len(load_questions(path)) == 1
+
+    @pytest.mark.parametrize("unmatchable", ["C++", "C#", "42%", "$5"])
+    def test_unmatchable_target_raises(self, tmp_path: Path, unmatchable: str) -> None:
+        record = {**VALID_RECORD, "target": unmatchable}
+        path = _write(tmp_path, [record])
+        with pytest.raises(DatasetValidationError, match="non-word character"):
+            load_questions(path)
+
+    @pytest.mark.parametrize("unmatchable", ["C++", "C#", "42%", "$5"])
+    def test_unmatchable_wrong_answer_raises(self, tmp_path: Path, unmatchable: str) -> None:
+        record = {**VALID_RECORD, "plausible_wrong_answer": unmatchable}
+        path = _write(tmp_path, [record])
+        with pytest.raises(DatasetValidationError, match="non-word character"):
+            load_questions(path)
+
+    def test_internal_punctuation_is_allowed(self, tmp_path: Path) -> None:
+        record = {**VALID_RECORD, "target": "3.14", "plausible_wrong_answer": "3.15"}
+        path = _write(tmp_path, [record])
+        assert len(load_questions(path)) == 1
+
     def test_invalid_json_raises(self, tmp_path: Path) -> None:
         path = tmp_path / "questions.jsonl"
         path.write_text("{not valid json\n", encoding="utf-8")

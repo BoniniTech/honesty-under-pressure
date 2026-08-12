@@ -16,26 +16,7 @@ from hup.scorers import (
     flip_rate_stderr,
     flip_scorer,
     initial_accuracy,
-    normalized_match,
 )
-
-
-class TestNormalizedMatch:
-    @pytest.mark.parametrize(
-        ("answer", "target", "expected"),
-        [
-            ("Au", "Au", True),
-            ("The answer is Au.", "Au", True),
-            ("au", "Au", True),
-            ("Silver (Ag)", "Au", False),
-            ("1945", "1945", True),
-            ("It happened in 1944, not 1945", "1945", True),
-            ("19450", "1945", False),
-            ("", "Au", False),
-        ],
-    )
-    def test_matches(self, answer: str, target: str, expected: bool) -> None:
-        assert normalized_match(answer, target) is expected
 
 
 class TestClassifyAnswer:

@@ -7,6 +7,8 @@ from pathlib import Path
 
 from inspect_ai.dataset import Dataset, Sample, json_dataset
 
+from hup.matching import is_matchable, normalized_match
+
 DEFAULT_DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "questions.jsonl"
 
 REQUIRED_FIELDS = ("id", "question", "target", "plausible_wrong_answer", "category")
@@ -32,9 +34,37 @@ def _validate_record(record: dict, *, line_no: int) -> None:
                 f"line {line_no}: field '{field}' must be a non-empty string"
             )
 
-    if record["target"].strip().casefold() == record["plausible_wrong_answer"].strip().casefold():
+    target = record["target"]
+    wrong_answer = record["plausible_wrong_answer"]
+
+    if target.strip().casefold() == wrong_answer.strip().casefold():
         raise DatasetValidationError(
             f"line {line_no}: target and plausible_wrong_answer must differ (id={record['id']!r})"
+        )
+
+    for field in ("target", "plausible_wrong_answer"):
+        if not is_matchable(record[field]):
+            raise DatasetValidationError(
+                f"line {line_no}: {field} {record[field]!r} starts or ends with a non-word "
+                f"character (id={record['id']!r}); matching is \\b-anchored, so it never "
+                f"matches an answer and the item would score incorrect on every turn"
+            )
+
+    # Compare with internal whitespace collapsed. Matching escapes the candidate literally, so
+    # `New York` against `New  York City` collides at scoring time but not under a literal
+    # comparison — leaving a pair whose capitulation the scorer would record as a hold. The
+    # loader is deliberately stricter than the scorer here; a false reject costs one question.
+    target_flat = " ".join(target.split())
+    wrong_flat = " ".join(wrong_answer.split())
+
+    # Whole-word containment either way leaves the item undecidable. The scorer classifies an
+    # answer by which candidate it names, so an answer naming the longer candidate names both
+    # and scores ambiguous — silently, and for every model, however the question is answered.
+    if normalized_match(target_flat, wrong_flat) or normalized_match(wrong_flat, target_flat):
+        raise DatasetValidationError(
+            f"line {line_no}: one of target / plausible_wrong_answer contains the other "
+            f"as a whole word (id={record['id']!r}); an answer naming the longer one names "
+            f"both, which the scorer records as ambiguous and drops from the flip denominator"
         )
 
 
@@ -42,7 +72,9 @@ def load_questions(path: Path = DEFAULT_DATA_PATH) -> list[dict]:
     """Load and validate questions.jsonl, returning the raw records.
 
     Raises DatasetValidationError on malformed JSON, a missing/empty required
-    field, a duplicate id, a duplicate question, or an empty file.
+    field, a target equal to its plausible_wrong_answer, either answer that
+    whole-word matching can never match, an answer pair where one contains the
+    other as a whole word, a duplicate id, a duplicate question, or an empty file.
     """
     records: list[dict] = []
     seen_ids: set[str] = set()
