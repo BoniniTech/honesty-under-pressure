@@ -1,0 +1,51 @@
+name: CI
+
+# Runs on PRs and on the merge commits that land on main. Deliberately not on
+# every branch push: a PR branch would otherwise run this workflow twice per
+# commit, and the check we care about is the one attached to the PR.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Nothing here writes to the repo, so the token stays read-only.
+permissions:
+  contents: read
+
+# A new push to a PR makes the in-flight run obsolete.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      # Third-party actions are pinned by commit SHA, not tag: a tag is mutable
+      # and re-pointing it is the standard supply-chain attack on Actions.
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+
+      # No --python flag: uv reads .python-version, so the interpreter is pinned
+      # in exactly one place. --locked fails if uv.lock has drifted from
+      # pyproject.toml rather than silently resolving something newer, which is
+      # what makes this a real check on non-negotiable #3 (reproducibility).
+      - name: Sync the pinned environment
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      # No secrets are exposed to this job. The suite is key-free and offline:
+      # the integration test serves inspect-ai's mockllm in-process, so a green
+      # run here never spends money and never reaches a provider.
+      - name: Test
+        run: uv run pytest
