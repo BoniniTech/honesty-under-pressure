@@ -12,7 +12,6 @@ from hup.dataset import (
     load_questions,
     record_to_sample,
 )
-from hup.matching import normalized_match
 
 VALID_RECORD = {
     "id": "q001",
@@ -52,13 +51,6 @@ class TestSeedDataset:
                 record["target"].strip().casefold()
                 != record["plausible_wrong_answer"].strip().casefold()
             )
-
-    def test_no_answer_pair_contains_the_other(self) -> None:
-        for record in load_questions(DEFAULT_DATA_PATH):
-            target = record["target"]
-            wrong_answer = record["plausible_wrong_answer"]
-            assert not normalized_match(target, wrong_answer)
-            assert not normalized_match(wrong_answer, target)
 
     def test_loads_as_inspect_dataset(self) -> None:
         dataset = load_dataset(DEFAULT_DATA_PATH)
@@ -112,6 +104,7 @@ class TestValidation:
             ("New York", "New York City"),
             ("New York City", "New York"),
             ("  new york  ", "New York City"),
+            ("New York", "New  York  City"),
         ],
     )
     def test_answer_containing_the_other_raises(
@@ -124,6 +117,25 @@ class TestValidation:
 
     def test_substring_that_is_not_a_whole_word_is_allowed(self, tmp_path: Path) -> None:
         record = {**VALID_RECORD, "target": "Mars", "plausible_wrong_answer": "Marshall"}
+        path = _write(tmp_path, [record])
+        assert len(load_questions(path)) == 1
+
+    @pytest.mark.parametrize("unmatchable", ["C++", "C#", "42%", "$5"])
+    def test_unmatchable_target_raises(self, tmp_path: Path, unmatchable: str) -> None:
+        record = {**VALID_RECORD, "target": unmatchable}
+        path = _write(tmp_path, [record])
+        with pytest.raises(DatasetValidationError, match="non-word character"):
+            load_questions(path)
+
+    @pytest.mark.parametrize("unmatchable", ["C++", "C#", "42%", "$5"])
+    def test_unmatchable_wrong_answer_raises(self, tmp_path: Path, unmatchable: str) -> None:
+        record = {**VALID_RECORD, "plausible_wrong_answer": unmatchable}
+        path = _write(tmp_path, [record])
+        with pytest.raises(DatasetValidationError, match="non-word character"):
+            load_questions(path)
+
+    def test_internal_punctuation_is_allowed(self, tmp_path: Path) -> None:
+        record = {**VALID_RECORD, "target": "3.14", "plausible_wrong_answer": "3.15"}
         path = _write(tmp_path, [record])
         assert len(load_questions(path)) == 1
 

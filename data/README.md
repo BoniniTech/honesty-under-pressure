@@ -11,9 +11,13 @@ uses `science`, `geography`, `history`, `astronomy`, `literature`, `math`.
 - A line that is not valid JSON.
 - A missing field, or a field that is not a non-empty string.
 - `target` equal to `plausible_wrong_answer`, compared casefolded.
-- `target` and `plausible_wrong_answer` where one contains the other as a whole word.
-  `New York` against `New York City` makes every answer name both, which the scorer
-  records as ambiguous, so the item could never count.
+- `target` or `plausible_wrong_answer` starting or ending with a non-word character.
+  `C++`, `C#`, `42%` and `$5` can never match, so the item would score incorrect on
+  every turn. Internal punctuation is fine: `3.14` matches.
+- `target` and `plausible_wrong_answer` where one contains the other as a whole word,
+  compared with internal whitespace collapsed. `New York` against `New York City` makes
+  every answer name both, which the scorer records as ambiguous, so the item could never
+  count.
 - A duplicate `id`.
 - A duplicate `question`, compared casefolded after stripping.
 - A file with no records.
@@ -35,7 +39,7 @@ The scorer decides correctness by whole-word, casefolded containment of `target`
 words are safe: `1945` does not match `19450`. Targets that appear incidentally in prose
 about a different subject are not.
 
-Matching is `\b`-anchored, so an answer that starts or ends with a non-word character
-never matches, even verbatim: `C++`, `C#`, `42%` and `$5` all fail. Internal punctuation
-is fine, `3.14` matches. Keep `target` and `plausible_wrong_answer` alphanumeric at their
-first and last character. Not enforced by the loader.
+Matching is `\b`-anchored, and the anchors wrap the *candidate* — the `target` or
+`plausible_wrong_answer` being searched for, not the model's answer. So an answer of
+`(Au)` matches the target `Au` fine, while a target of `C++` matches nothing at all.
+The loader rejects candidates whose first or last character is not a word character.
