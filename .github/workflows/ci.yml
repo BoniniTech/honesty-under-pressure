@@ -8,9 +8,17 @@ on:
     branches: [main]
   pull_request:
 
-# Nothing here writes to the repo, so the token stays read-only.
+# The job never writes code. `pull-requests: write` exists solely so the coverage
+# step can post its comment, and it cannot push to a branch.
+#
+# Fork PRs get a read-only GITHUB_TOKEN, so the comment step is skipped there and
+# coverage shows up in the job summary only. The usual workaround is
+# `pull_request_target`, which runs fork-authored code with a privileged token —
+# not worth a comment. If forks ever matter, split the comment into a second
+# workflow triggered by `workflow_run`.
 permissions:
   contents: read
+  pull-requests: write
 
 # A new push to a PR makes the in-flight run obsolete.
 concurrency:
@@ -47,5 +55,53 @@ jobs:
       # No secrets are exposed to this job. The suite is key-free and offline:
       # the integration test serves inspect-ai's mockllm in-process, so a green
       # run here never spends money and never reaches a provider.
+      #
+      # The fail_under floor lives in pyproject.toml, so a local `pytest --cov`
+      # gates identically to CI.
       - name: Test
-        run: uv run pytest
+        run: uv run pytest --cov
+
+      # Always runs: a coverage drop that fails the gate is exactly when the
+      # table is worth reading.
+      - name: Write the coverage table to the job summary
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "## Coverage"
+            echo
+            uv run coverage report --format=markdown
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Skipped on fork PRs, where GITHUB_TOKEN cannot write. The gate above is
+      # what enforces coverage; this comment only reports it.
+      - name: Comment the coverage table on the pull request
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          # Not GITHUB_SHA: on a pull_request event that is the ephemeral merge
+          # commit, which no one can look up.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          marker='<!-- coverage-report -->'
+          {
+            echo "$marker"
+            echo "## Coverage"
+            echo
+            uv run coverage report --format=markdown
+            echo
+            echo "_Commit \`${HEAD_SHA:0:7}\`. Floor is \`fail_under\` in \`pyproject.toml\`._"
+          } > comment.md
+
+          # One comment per PR, edited in place, so a long PR does not accumulate
+          # a coverage table per push.
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq "[.[] | select(.body | startswith(\"$marker\"))] | first | .id // empty")
+
+          if [ -n "$existing" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" \
+              -F body=@comment.md
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+              -F body=@comment.md
+          fi

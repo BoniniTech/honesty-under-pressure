@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.3", "ruff>=0.8"]
+dev = ["pytest>=8.3", "pytest-cov>=7.1", "ruff>=0.8"]
 
 [build-system]
 requires = ["hatchling"]
@@ -33,3 +33,13 @@ testpaths = ["tests"]
 markers = [
     "integration: runs a full eval against the in-process mock model (no API key, no network)",
 ]
+
+# Coverage is configured here but not enabled in addopts: a bare `pytest` stays
+# fast for local iteration, and CI opts in with --cov.
+[tool.coverage.run]
+source = ["src/hup"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 95

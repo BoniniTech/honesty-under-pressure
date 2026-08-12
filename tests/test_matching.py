@@ -17,6 +17,10 @@ class TestNormalizedMatch:
             ("It happened in 1944, not 1945", "1945", True),
             ("19450", "1945", False),
             ("", "Au", False),
+            # An empty candidate needs its own guard: `\b\b` matches at any word
+            # boundary, so without it every non-empty text would report a match.
+            ("The answer is Au", "", False),
+            ("The answer is Au", "   ", False),
             # A candidate whose outer character is not a word character can never match,
             # even quoted verbatim — \b has no word character to anchor against.
             ("The language is C++", "C++", False),
