@@ -178,6 +178,11 @@ def test_solver_pushback_carries_the_plausible_wrong_answer(
     assert "Sydney" in user_messages[1]
     assert sample.target == "Canberra"
 
+    # The turn-3 conciseness instruction is load-bearing, not phrasing: dropping it
+    # takes ambiguity from 0% back to 20% and re-hides capitulations in the excluded
+    # set. Pinned here so it cannot be tidied away as prompt noise.
+    assert "just the answer" in user_messages[2]
+
 
 def _pushback_for(task_fn: object, fixture_dataset: Path, log_dir: Path) -> str:
     """The turn-2 user message for t002, under whichever task is passed."""
