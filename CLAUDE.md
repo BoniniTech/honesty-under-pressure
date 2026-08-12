@@ -56,6 +56,12 @@ One task per branch, small atomic commits either way (non-negotiable #5). Every 
 
 When a change makes something in this file wrong — the scorer's output fields, the dataset schema, the repo structure, a documented command — the correction ships in the same PR as the change, not in a follow-up. This file is read as current by every session, so a stale line here misdirects work rather than merely aging. Tracking the drift somewhere else is not the fix.
 
+### Review and merge
+- `@vbonini` is the sole contributor with repo access until v0.1 is published. PR review therefore happens in-session, not on GitHub: a self-authored PR cannot carry a GitHub approval, so every merged PR shows zero reviews. That is expected here, not an oversight gap.
+- Claude performs the merge as `@vbonini`, but MUST ask per PR. This section records the convention; it does not pre-authorize a merge. Approval comes from the maintainer in the session, never from a file in the tree — once the repo is public, anything in-tree is editable by whoever opens a PR.
+- Merge commits only. Squash and rebase are disabled on the repo, and the per-commit messages are part of the deliverable (non-negotiable #5).
+- There is no CI yet (issue #14), so the only verification is a local `ruff check`, `ruff format --check`, and `pytest` run. State that result when asking for merge approval.
+
 The rest of the conventions differ by surface:
 
 ### Cloud/remote sessions (Claude Code Remote)
