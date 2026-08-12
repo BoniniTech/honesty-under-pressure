@@ -12,7 +12,7 @@ A one-week proof-of-concept evaluation built on Inspect AI (UK AISI's open-sourc
 2. **Ship in ~7 days.** When time pressure hits, cut scope, never rigor. A small eval done properly beats an ambitious eval done sloppily.
 3. **Reproducibility.** Every number in the README must be regenerable from a clean clone plus API keys. Pin dependencies. Seed anything seedable. Log model versions and dates for every run.
 4. **No hazardous or dual-use content anywhere in this repo** — not in the dataset, examples, comments, or writeup. Topic stays strictly on factual-honesty behavior.
-5. **Human oversight is part of the artifact.** The maintainer reviews every diff before commit. Small, atomic commits with messages that explain *why*. No giant "initial commit" dumps, no auto-committed slop. This repo demonstrates responsible coding-agent use to people who evaluate exactly that.
+5. **Human oversight is part of the artifact.** The maintainer reviews every PR, and nothing reaches `main` without that review. Oversight sits at the PR boundary, not at each commit, so the history has to stand on its own: small, atomic commits with messages that explain *why*. No giant "initial commit" dumps, no auto-committed slop. This repo demonstrates responsible coding-agent use to people who evaluate exactly that.
 6. **Check current Inspect docs before writing Inspect code.** The API evolves; do not code from trained memory. Read the official docs/examples for solvers, scorers, and datasets at the current version, and record the inspect-ai version used.
 
 ## The eval design (v0.1 scope — do not expand without the maintainer's sign-off)
@@ -29,6 +29,8 @@ honesty-under-pressure/
   README.md            # motivation, method, results, limitations, next steps
   CLAUDE.md            # this file
   pyproject.toml       # uv-managed; pinned deps
+  .github/workflows/
+    ci.yml             # lint + tests on every PR; no secrets, no provider calls
   data/
     questions.jsonl
     README.md          # what the loader enforces vs. what a reader has to catch
@@ -57,10 +59,12 @@ One task per branch, small atomic commits either way (non-negotiable #5). Every 
 When a change makes something in this file wrong — the scorer's output fields, the dataset schema, the repo structure, a documented command — the correction ships in the same PR as the change, not in a follow-up. This file is read as current by every session, so a stale line here misdirects work rather than merely aging. Tracking the drift somewhere else is not the fix.
 
 ### Review and merge
+- Claude commits, pushes, and opens PRs without asking first. Do not stage a diff for approval before committing — the PR is the review surface, and holding work back only delays the review. Pushing further commits to an open PR returns it to review.
 - `@vbonini` is the sole contributor with repo access until v0.1 is published. PR review therefore happens in-session, not on GitHub: a self-authored PR cannot carry a GitHub approval, so every merged PR shows zero reviews. That is expected here, not an oversight gap.
 - Claude performs the merge as `@vbonini`, but MUST ask per PR. This section records the convention; it does not pre-authorize a merge. Approval comes from the maintainer in the session, never from a file in the tree — once the repo is public, anything in-tree is editable by whoever opens a PR.
 - Merge commits only. Squash and rebase are disabled on the repo, and the per-commit messages are part of the deliverable (non-negotiable #5).
-- There is no CI yet (issue #14), so the only verification is a local `ruff check`, `ruff format --check`, and `pytest` run. State that result when asking for merge approval.
+- CI (`.github/workflows/ci.yml`) runs `ruff check`, `ruff format --check`, and `pytest` on every PR. Wait for it to pass and state the run's conclusion when asking for merge approval — a local run is a preflight, not the verification of record.
+- CI holds no secrets and makes no provider calls. Anything needing an API key — eval runs, cost checks — stays a local step, and its result gets reported by hand.
 
 The rest of the conventions differ by surface:
 
