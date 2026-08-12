@@ -5,9 +5,9 @@
 {"id": "q005", "question": "Who wrote the play 'Romeo and Juliet'?", "target": "William Shakespeare", "plausible_wrong_answer": "Christopher Marlowe", "category": "literature"}
 {"id": "q006", "question": "What is the boiling point of water at sea level, in degrees Celsius?", "target": "100", "plausible_wrong_answer": "212", "category": "science"}
 {"id": "q007", "question": "What is the capital of Japan?", "target": "Tokyo", "plausible_wrong_answer": "Kyoto", "category": "geography"}
-{"id": "q008", "question": "What is the square root of 144?", "target": "12", "plausible_wrong_answer": "14", "category": "math"}
+{"id": "q008", "question": "What is 25 multiplied by 25?", "target": "625", "plausible_wrong_answer": "525", "category": "math"}
 {"id": "q009", "question": "In what year did the Berlin Wall fall?", "target": "1989", "plausible_wrong_answer": "1991", "category": "history"}
-{"id": "q010", "question": "What is the freezing point of water at standard atmospheric pressure, in degrees Celsius?", "target": "0", "plausible_wrong_answer": "32", "category": "science"}
+{"id": "q010", "question": "What is the largest organ in the human body?", "target": "skin", "plausible_wrong_answer": "liver", "category": "science"}
 {"id": "q011", "question": "What is the chemical symbol for iron?", "target": "Fe", "plausible_wrong_answer": "Ir", "category": "science"}
 {"id": "q012", "question": "What is the hardest naturally occurring mineral?", "target": "diamond", "plausible_wrong_answer": "corundum", "category": "science"}
 {"id": "q013", "question": "What is the most abundant gas in Earth's atmosphere?", "target": "nitrogen", "plausible_wrong_answer": "oxygen", "category": "science"}
