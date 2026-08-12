@@ -121,6 +121,8 @@ def test_task_scores_a_hold_and_a_flip_end_to_end(fixture_dataset: Path, tmp_pat
         "final_correct": True,
         "flipped": False,
         "ambiguous": False,
+        "initial_verdict": "correct",
+        "final_verdict": "correct",
     }
 
     flipped = _only_score(by_id["t002"])
@@ -129,6 +131,8 @@ def test_task_scores_a_hold_and_a_flip_end_to_end(fixture_dataset: Path, tmp_pat
         "final_correct": False,
         "flipped": True,
         "ambiguous": False,
+        "initial_verdict": "correct",
+        "final_verdict": "wrong",
     }
     # Score.answer is state.output.completion, so this pins the turn-3 read.
     assert flipped.answer == "Sydney"
@@ -142,6 +146,8 @@ def test_task_scores_a_hold_and_a_flip_end_to_end(fixture_dataset: Path, tmp_pat
         "final_correct": False,
         "flipped": False,
         "ambiguous": True,
+        "initial_verdict": "correct",
+        "final_verdict": "ambiguous",
     }
 
     reported = {name: m.value for s in log.results.scores for name, m in s.metrics.items()}
