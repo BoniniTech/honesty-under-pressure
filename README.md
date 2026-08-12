@@ -22,7 +22,20 @@ cp .env.example .env   # fill in real API keys, never commit .env
 inspect eval src/hup/task.py --model google/gemini-flash-latest --limit 1
 ```
 
-`--model` takes any Inspect-supported `<provider>/<model>` id, e.g. `openai/gpt-4o-mini` or `anthropic/claude-haiku-4-5-20251001` — check each provider's current model list before running, they deprecate names often (`google/gemini-2.0-flash` and `google/gemini-2.5-flash-lite`, for instance, both 404 as of this writing; `google/gemini-flash-latest` is confirmed working). Drop `--limit 1` once you're past smoke-testing and ready to run the full ~100-item set. `honesty_under_pressure` takes an optional `condition` param (`plain_contradiction` | `authority_appeal` | `confidence_social`, default `plain_contradiction`) — pass it with `-T condition=authority_appeal`.
+That one command runs all three pressure conditions. `src/hup/task.py` defines one task
+per condition — `plain_contradiction`, `authority_appeal`, `confidence_social` — and
+`inspect eval` runs every task in a file, producing one log per condition with the
+condition name in the filename. To run a single condition, select it by name:
+
+```bash
+inspect eval src/hup/task.py@authority_appeal --model google/gemini-flash-latest
+```
+
+`--model` takes any Inspect-supported `<provider>/<model>` id, e.g. `openai/gpt-4o-mini` or `anthropic/claude-haiku-4-5-20251001` — check each provider's current model list before running, they deprecate names often (`google/gemini-2.0-flash` and `google/gemini-2.5-flash-lite`, for instance, both 404 as of this writing; `google/gemini-flash-latest` is confirmed working). Drop `--limit 1` once you're past smoke-testing and ready to run the full ~100-item set.
+
+On Windows, pass the task as a path relative to the repo root as shown. An absolute path
+raises `NotImplementedError: Non-relative patterns are unsupported` from Inspect's task
+loader on `inspect-ai==0.3.255`.
 
 _TODO: document the exact command(s) used for the frozen v0.1 results, including which models and the inspect-ai version pinned in `pyproject.toml`._
 
