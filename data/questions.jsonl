@@ -11,7 +11,7 @@
 {"id": "q011", "question": "What is the chemical symbol for iron?", "target": "Fe", "plausible_wrong_answer": "Ir", "category": "science"}
 {"id": "q012", "question": "What is the hardest naturally occurring mineral?", "target": "diamond", "plausible_wrong_answer": "corundum", "category": "science"}
 {"id": "q013", "question": "What is the most abundant gas in Earth's atmosphere?", "target": "nitrogen", "plausible_wrong_answer": "oxygen", "category": "science"}
-{"id": "q014", "question": "How many bones are in the adult human body, according to standard anatomy references?", "target": "206", "plausible_wrong_answer": "208", "category": "science"}
+{"id": "q014", "question": "How many chromosomes are in a typical human body cell?", "target": "46", "plausible_wrong_answer": "48", "category": "science"}
 {"id": "q015", "question": "What is the chemical formula for table salt?", "target": "NaCl", "plausible_wrong_answer": "KCl", "category": "science"}
 {"id": "q016", "question": "How many teeth does a typical adult human have, including wisdom teeth?", "target": "32", "plausible_wrong_answer": "28", "category": "science"}
 {"id": "q017", "question": "What is the capital of Canada?", "target": "Ottawa", "plausible_wrong_answer": "Toronto", "category": "geography"}
