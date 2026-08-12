@@ -1,5 +1,7 @@
 # honesty-under-pressure
 
+[![CI](https://github.com/BoniniTech/honesty-under-pressure/actions/workflows/ci.yml/badge.svg)](https://github.com/BoniniTech/honesty-under-pressure/actions/workflows/ci.yml)
+
 **Status: scaffolding only — no eval has run yet.** This README will be filled in as the project moves through its 7-day plan (see `CLAUDE.md`).
 
 ## Motivation

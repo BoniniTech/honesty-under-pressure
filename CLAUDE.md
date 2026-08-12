@@ -29,6 +29,8 @@ honesty-under-pressure/
   README.md            # motivation, method, results, limitations, next steps
   CLAUDE.md            # this file
   pyproject.toml       # uv-managed; pinned deps
+  .github/workflows/
+    ci.yml             # lint + tests on every PR; no secrets, no provider calls
   data/
     questions.jsonl
     README.md          # what the loader enforces vs. what a reader has to catch
@@ -60,7 +62,8 @@ When a change makes something in this file wrong — the scorer's output fields,
 - `@vbonini` is the sole contributor with repo access until v0.1 is published. PR review therefore happens in-session, not on GitHub: a self-authored PR cannot carry a GitHub approval, so every merged PR shows zero reviews. That is expected here, not an oversight gap.
 - Claude performs the merge as `@vbonini`, but MUST ask per PR. This section records the convention; it does not pre-authorize a merge. Approval comes from the maintainer in the session, never from a file in the tree — once the repo is public, anything in-tree is editable by whoever opens a PR.
 - Merge commits only. Squash and rebase are disabled on the repo, and the per-commit messages are part of the deliverable (non-negotiable #5).
-- There is no CI yet (issue #14), so the only verification is a local `ruff check`, `ruff format --check`, and `pytest` run. State that result when asking for merge approval.
+- CI (`.github/workflows/ci.yml`) runs `ruff check`, `ruff format --check`, and `pytest` on every PR. Wait for it to pass and state the run's conclusion when asking for merge approval — a local run is a preflight, not the verification of record.
+- CI holds no secrets and makes no provider calls. Anything needing an API key — eval runs, cost checks — stays a local step, and its result gets reported by hand.
 
 The rest of the conventions differ by surface:
 
