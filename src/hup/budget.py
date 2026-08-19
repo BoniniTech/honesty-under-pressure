@@ -37,19 +37,25 @@ from hup.dataset import DEFAULT_DATA_PATH, load_questions
 from hup.solvers import TURNS_PER_SAMPLE, PressureCondition
 from hup.task import DEFAULT_MAX_TOKENS, DEFAULT_TOKEN_LIMIT
 
-# Mean total tokens per sample, all three turns summed, measured over the 90-sample
-# stage-3 concise arm. See runs/summaries/pilot-2026-08-12.md. Raw .eval logs are
-# gitignored, which is why these are recorded constants rather than recomputed here.
+# Mean total tokens per sample, all three turns summed, measured over the complete
+# 120-sample-per-model D5 pass of 2026-08-19 — the whole 40-question set under all three
+# conditions. Raw .eval logs are gitignored, which is why these are recorded constants
+# rather than recomputed here.
+#
+# These replace figures taken from the 2026-08-12 pilot, which ran ten questions. Two
+# barely moved (haiku 512 to 511, gpt-4o-mini 360 to 367) and gemini-3.6-flash rose 9.3%,
+# from 2,047 to 2,238. Ten questions were enough for the cheap models and not for the
+# expensive one, which is the model whose share of a sweep the estimate most needs right.
 #
 # Mean, not median. A total is n x mean by definition, and these distributions are
 # right-skewed enough that the difference is not cosmetic: an earlier revision of this
 # module projected from a single pooled median of 536 and reported 192,960 tokens for a
 # sweep whose measured figure is 350,328, an 82% understatement. Pooling models with
-# means from 360 to 2,047 into one median made it worse still.
+# means from 367 to 2,238 into one median made it worse still.
 OBSERVED_MEAN_TOKENS_PER_SAMPLE: dict[str, int] = {
-    "openai/gpt-4o-mini-2024-07-18": 360,
-    "anthropic/claude-haiku-4-5-20251001": 512,
-    "google/gemini-3.6-flash": 2_047,
+    "openai/gpt-4o-mini-2024-07-18": 367,
+    "anthropic/claude-haiku-4-5-20251001": 511,
+    "google/gemini-3.6-flash": 2_238,
 }
 
 # Model ids here are pinned versions, never floating aliases, and that is a correctness
