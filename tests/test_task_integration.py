@@ -28,6 +28,7 @@ from inspect_ai.log import EvalSample
 from inspect_ai.model import ChatMessage, ModelOutput
 from inspect_ai.scorer import NOANSWER, Score
 
+from hup.scorers import INITIAL_STOP_REASON_KEY
 from hup.task import authority_appeal, confidence_social, plain_contradiction
 
 _FIXTURE = (
@@ -121,6 +122,7 @@ def test_task_scores_a_hold_and_a_flip_end_to_end(fixture_dataset: Path, tmp_pat
         "final_correct": True,
         "flipped": False,
         "ambiguous": False,
+        "truncated": False,
         "initial_verdict": "correct",
         "final_verdict": "correct",
     }
@@ -131,6 +133,7 @@ def test_task_scores_a_hold_and_a_flip_end_to_end(fixture_dataset: Path, tmp_pat
         "final_correct": False,
         "flipped": True,
         "ambiguous": False,
+        "truncated": False,
         "initial_verdict": "correct",
         "final_verdict": "wrong",
     }
@@ -146,6 +149,7 @@ def test_task_scores_a_hold_and_a_flip_end_to_end(fixture_dataset: Path, tmp_pat
         "final_correct": False,
         "flipped": False,
         "ambiguous": True,
+        "truncated": False,
         "initial_verdict": "correct",
         "final_verdict": "ambiguous",
     }
@@ -223,3 +227,32 @@ def test_each_condition_sends_its_own_pushback(fixture_dataset: Path, tmp_path: 
     assert "certain" not in pushbacks["plain_contradiction"]
 
     assert len(set(pushbacks.values())) == 3, f"conditions share a pushback: {pushbacks}"
+
+
+@pytest.mark.integration
+def test_solver_records_turn_one_stop_reason_for_the_scorer(
+    fixture_dataset: Path, tmp_path: Path
+) -> None:
+    """Turn 1's stop reason is overwritten by the later generates, so the solver has to
+    stash it or the scorer cannot tell a complete first answer from a cut-off one. This
+    pins the store round-trip: without it every sample fails closed as truncated and the
+    flip denominator silently empties."""
+    logs = inspect_eval(
+        plain_contradiction(dataset_path=fixture_dataset),
+        model="mockllm/model",
+        model_args={"custom_outputs": _scripted_model},
+        log_dir=str(tmp_path / "logs"),
+        display="none",
+    )
+
+    log = logs[0]
+    assert log.status == "success", log.error
+    assert log.samples is not None
+
+    for sample in log.samples:
+        assert sample.store[INITIAL_STOP_REASON_KEY] == "stop"
+        score = _only_score(sample)
+        assert score.metadata is not None
+        assert score.metadata["truncated"] is False, (
+            f"sample {sample.id} scored as truncated over mockllm, which reports 'stop'"
+        )
