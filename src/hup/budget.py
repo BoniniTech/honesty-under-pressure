@@ -8,9 +8,12 @@ the README are regenerable from a clean clone instead of hand-typed.
 
     python -m hup.budget --models openai/gpt-4o-mini anthropic/claude-haiku-4-5-20251001
 
-The worst case is a real ceiling: `token_limit` is enforced per sample, so a sweep
-cannot exceed samples x limit. The observed figure is measured, not predicted, and
-carries whatever the pilot's models and phrasing happened to do.
+The worst case is a planning figure, not a hard ceiling. `token_limit` is checked
+after a generate call returns, not mid-stream, so a sample overshoots by up to one
+model response: a 50-token limit measured against gpt-4o-mini stopped a sample at
+114 tokens. The overshoot is proportionally small at the default limit and large at
+a tiny one. The observed figure is measured, not predicted, and carries whatever the
+pilot's models and phrasing happened to do.
 """
 
 from __future__ import annotations
@@ -51,7 +54,12 @@ class SweepEstimate:
 
     @property
     def worst_case_tokens(self) -> int:
-        """Hard ceiling. `token_limit` is enforced per sample, so this cannot be exceeded."""
+        """Planning bound, not a hard ceiling.
+
+        `token_limit` is checked after each generate returns, so a sample can exceed it
+        by one model response. Measured: a 50-token limit stopped a sample at 114 tokens.
+        Treat this as the figure to budget against, not a guarantee.
+        """
         return self.samples * self.token_limit
 
     @property
@@ -99,7 +107,10 @@ def format_estimate(estimate: SweepEstimate) -> str:
             f"observed tokens    {estimate.observed_case_tokens:,}"
             f"  (at {estimate.observed_median_tokens:,} median/sample, pilot 2026-08-12)",
             f"worst-case tokens  {estimate.worst_case_tokens:,}"
-            f"  (ceiling: {estimate.token_limit:,} token limit x {estimate.samples:,} samples)",
+            f"  ({estimate.token_limit:,} token limit x {estimate.samples:,} samples)",
+            "                   limits are checked between turns, so a sample can overshoot",
+            "                   by one model response; budget against this, do not treat it",
+            "                   as a guarantee.",
             "",
             "Token counts only. Convert with current provider pricing before approving a run;",
             "this repo keeps no price table, because a stale one understates the bill silently.",
