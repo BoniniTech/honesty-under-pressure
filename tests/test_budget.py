@@ -24,7 +24,8 @@ from inspect_ai import eval as inspect_eval
 from inspect_ai.model import ChatMessage, ModelOutput
 
 from hup.budget import (
-    OBSERVED_MEDIAN_TOKENS_PER_SAMPLE,
+    OBSERVED_MEAN_TOKENS_PER_SAMPLE,
+    UNMEASURED_MEAN_TOKENS_PER_SAMPLE,
     SweepEstimate,
     estimate_sweep,
     format_estimate,
@@ -40,6 +41,15 @@ from hup.task import (
 )
 
 _TASKS = (plain_contradiction, authority_appeal, confidence_social)
+
+# Three measured models, so estimates in these tests project from recorded means rather
+# than the unmeasured-model stand-in.
+_MEASURED = tuple(OBSERVED_MEAN_TOKENS_PER_SAMPLE)
+
+
+def _estimate(**kwargs: object) -> SweepEstimate:
+    kwargs.setdefault("models", _MEASURED)
+    return estimate_sweep(**kwargs)  # type: ignore[arg-type]
 
 
 def _dataset(path: Path, count: int) -> Path:
@@ -96,46 +106,83 @@ def test_default_token_limit_clears_the_observed_worst_case() -> None:
 def test_estimate_derives_question_count_from_the_dataset(tmp_path: Path) -> None:
     """Derived, not passed, so the estimate cannot describe a dataset that is not the
     one about to run."""
-    estimate = estimate_sweep(models=2, dataset_path=_dataset(tmp_path / "q.jsonl", 7))
+    estimate = _estimate(models=_MEASURED[:2], dataset_path=_dataset(tmp_path / "q.jsonl", 7))
     assert estimate.questions == 7
 
 
 def test_estimate_derives_conditions_from_the_solver(tmp_path: Path) -> None:
-    estimate = estimate_sweep(models=1, dataset_path=_dataset(tmp_path / "q.jsonl", 1))
+    estimate = _estimate(models=_MEASURED[:1], dataset_path=_dataset(tmp_path / "q.jsonl", 1))
     assert estimate.conditions == len(get_args(PressureCondition))
 
 
 def test_sample_and_call_arithmetic(tmp_path: Path) -> None:
-    estimate = estimate_sweep(models=3, dataset_path=_dataset(tmp_path / "q.jsonl", 10))
+    estimate = _estimate(dataset_path=_dataset(tmp_path / "q.jsonl", 10))
     assert estimate.samples == 10 * estimate.conditions * 3
     assert estimate.generate_calls == estimate.samples * TURNS_PER_SAMPLE
 
 
+def _fixed_estimate(**overrides: object) -> SweepEstimate:
+    fields: dict = {
+        "questions": 40,
+        "conditions": 3,
+        "models": ("a", "b", "c"),
+        "passes": 1,
+        "token_limit": 10_000,
+        "max_tokens": 2_000,
+        "mean_tokens_by_model": {"a": 100, "b": 200, "c": 300},
+    }
+    fields.update(overrides)
+    return SweepEstimate(**fields)  # type: ignore[arg-type]
+
+
 def test_worst_case_is_the_per_sample_limit_times_samples() -> None:
-    estimate = SweepEstimate(
-        questions=40,
-        conditions=3,
-        models=3,
-        token_limit=10_000,
-        max_tokens=2_000,
-        observed_median_tokens=536,
-    )
+    estimate = _fixed_estimate()
     assert estimate.samples == 360
     assert estimate.worst_case_tokens == 3_600_000
-    assert estimate.observed_case_tokens == 360 * 536
+
+
+def test_observed_case_sums_per_model_rather_than_scaling_one_average() -> None:
+    """The bug this replaced: projecting a total from a single pooled median understated
+    a sweep by 82%, because a total is n x mean and the models differ by more than 5x."""
+    estimate = _fixed_estimate()
+    # 40 questions x 3 conditions x 1 pass, at each model's own mean.
+    assert estimate.observed_tokens_for("a") == 120 * 100
+    assert estimate.observed_tokens_for("c") == 120 * 300
+    assert estimate.observed_case_tokens == 120 * (100 + 200 + 300)
+
+
+def test_passes_multiply_every_total() -> None:
+    one, five = _fixed_estimate(), _fixed_estimate(passes=5)
+    assert five.samples == one.samples * 5
+    assert five.samples_per_pass == one.samples_per_pass
+    assert five.observed_case_tokens == one.observed_case_tokens * 5
+    assert five.ceiling_tokens == one.ceiling_tokens * 5
+
+
+def test_an_unmeasured_model_is_projected_at_the_highest_observed_rate() -> None:
+    """Guessing low produces a budget that is approved and then exceeded, which is the
+    failure this module exists to prevent."""
+    estimate = estimate_sweep(models=["some/brand-new-model"])
+    assert estimate.unmeasured_models == ("some/brand-new-model",)
+    assert estimate.mean_tokens_by_model["some/brand-new-model"] == (
+        UNMEASURED_MEAN_TOKENS_PER_SAMPLE
+    )
+    assert UNMEASURED_MEAN_TOKENS_PER_SAMPLE == max(OBSERVED_MEAN_TOKENS_PER_SAMPLE.values())
+
+
+def test_a_measured_model_is_not_flagged_as_assumed() -> None:
+    assert _estimate().unmeasured_models == ()
+
+
+def test_format_marks_unmeasured_models(capsys: pytest.CaptureFixture) -> None:
+    text = format_estimate(estimate_sweep(models=["some/brand-new-model"]))
+    assert "no measurement, assumed" in text
 
 
 def test_ceiling_adds_a_bounded_overshoot_to_the_worst_case() -> None:
     """The limit is checked between turns, so a sample is billed for the response it had
     already committed to. max_tokens is what bounds that response."""
-    estimate = SweepEstimate(
-        questions=40,
-        conditions=3,
-        models=3,
-        token_limit=10_000,
-        max_tokens=2_000,
-        observed_median_tokens=536,
-    )
+    estimate = _fixed_estimate()
     assert estimate.overshoot_per_sample == TURNS_PER_SAMPLE * 2_000
     assert estimate.ceiling_tokens == 360 * (10_000 + 6_000)
     assert estimate.ceiling_tokens > estimate.worst_case_tokens
@@ -144,8 +191,8 @@ def test_ceiling_adds_a_bounded_overshoot_to_the_worst_case() -> None:
 def test_ceiling_scales_with_max_tokens_not_just_the_limit() -> None:
     """If max_tokens stopped feeding the ceiling, the overshoot would silently vanish
     from the estimate and the number would look like a guarantee it is not."""
-    loose = estimate_sweep(models=1, max_tokens=4_000)
-    tight = estimate_sweep(models=1, max_tokens=500)
+    loose = _estimate(max_tokens=4_000)
+    tight = _estimate(max_tokens=500)
     assert loose.ceiling_tokens > tight.ceiling_tokens
     assert loose.worst_case_tokens == tight.worst_case_tokens
 
@@ -153,17 +200,18 @@ def test_ceiling_scales_with_max_tokens_not_just_the_limit() -> None:
 def test_observed_case_is_far_below_the_ceiling() -> None:
     """If these converge, the cap is too tight and is shaping results rather than
     bounding accidents."""
-    estimate = estimate_sweep(models=3)
+    estimate = _estimate()
     assert estimate.observed_case_tokens * 5 < estimate.worst_case_tokens
 
 
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [
-        ({"models": 0}, "models must be at least 1"),
-        ({"models": -1}, "models must be at least 1"),
-        ({"models": 1, "token_limit": 0}, "token_limit must be at least 1"),
-        ({"models": 1, "max_tokens": 0}, "max_tokens must be at least 1"),
+        ({"models": []}, "at least one model is required"),
+        ({"models": ["a", "a"]}, "models must be unique"),
+        ({"models": ["a"], "passes": 0}, "passes must be at least 1"),
+        ({"models": ["a"], "token_limit": 0}, "token_limit must be at least 1"),
+        ({"models": ["a"], "max_tokens": 0}, "max_tokens must be at least 1"),
     ],
 )
 def test_rejects_impossible_configurations(kwargs: dict, message: str) -> None:
@@ -172,7 +220,7 @@ def test_rejects_impossible_configurations(kwargs: dict, message: str) -> None:
 
 
 def test_format_reports_both_cases_and_refuses_to_quote_dollars() -> None:
-    text = format_estimate(estimate_sweep(models=3))
+    text = format_estimate(_estimate())
     assert "worst-case tokens" in text
     assert "observed tokens" in text
     # No price table ships with this repo; a stale one understates the bill silently.
@@ -183,7 +231,7 @@ def test_format_separates_the_planning_figure_from_the_real_ceiling() -> None:
     """Three numbers that mean different things, and conflating them is how a budget
     conversation goes wrong. An earlier revision reported the worst case alone and called
     it a ceiling, which was measurably false: a 50-token limit billed 114 tokens."""
-    text = format_estimate(estimate_sweep(models=3))
+    text = format_estimate(_estimate())
     assert "observed tokens" in text
     assert "worst-case tokens" in text
     assert "ceiling tokens" in text
@@ -217,10 +265,11 @@ def test_main_requires_models(capsys: pytest.CaptureFixture) -> None:
         main([])
 
 
-def test_observed_median_is_recorded_not_zero() -> None:
-    """Sourced from runs/summaries/pilot-2026-08-12.md. A zero here would make every
-    observed estimate read as free."""
-    assert OBSERVED_MEDIAN_TOKENS_PER_SAMPLE > 0
+def test_every_recorded_mean_is_positive() -> None:
+    """Sourced from runs/summaries/pilot-2026-08-12.md. A zero would make that model's
+    share of every estimate read as free."""
+    assert OBSERVED_MEAN_TOKENS_PER_SAMPLE
+    assert all(mean > 0 for mean in OBSERVED_MEAN_TOKENS_PER_SAMPLE.values())
 
 
 def _one_reply(_messages: list[ChatMessage], *_a: object, **_k: object) -> ModelOutput:
