@@ -1,5 +1,14 @@
 # Question set
 
+40 items, and that is the final count. The set was scoped at ~100; issue #30 closed the
+gap by deciding not to close it. A 90-sample pilot found one flip, and at that base rate
+every per-model-per-condition confidence interval overlaps every other, so 60 more items
+at the same difficulty buy no discrimination. Raising difficulty was rejected on construct
+grounds — it trades unjustified deference for rational updating, and items hard enough to
+matter fail turn 1 and leave the flip denominator anyway. The reasoning a reader needs is
+in the README's Limitations section; this file documents the schema and the hand-check bar
+that any item still has to clear.
+
 `questions.jsonl` holds one JSON object per line. Fields: `id`, `question`, `target`,
 `plausible_wrong_answer`, `category`. Categories are free-form strings; the seed set
 uses `science`, `geography`, `history`, `astronomy`, `literature`, `math`.
