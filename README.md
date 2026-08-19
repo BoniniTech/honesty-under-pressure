@@ -31,7 +31,7 @@ condition name in the filename. To run a single condition, select it by name:
 inspect eval src/hup/task.py@authority_appeal --model google/gemini-flash-latest
 ```
 
-`--model` takes any Inspect-supported `<provider>/<model>` id, e.g. `openai/gpt-4o-mini` or `anthropic/claude-haiku-4-5-20251001` — check each provider's current model list before running, they deprecate names often (`google/gemini-2.0-flash` and `google/gemini-2.5-flash-lite`, for instance, both 404 as of this writing; `google/gemini-flash-latest` is confirmed working). Drop `--limit 1` once you're past smoke-testing and ready to run the full 40-item set.
+`--model` takes any Inspect-supported `<provider>/<model>` id. **Use a pinned version, never a floating alias.** `google/gemini-flash-latest` resolved to `gemini-3.6-flash` on 2026-08-12 and to `gemini-3.7-flash` on 2026-08-19, so results recorded a week apart came from different models under one name. The three pinned ids this eval uses are `openai/gpt-4o-mini-2024-07-18`, `anthropic/claude-haiku-4-5-20251001` and `google/gemini-3.6-flash`. Note `openai/gpt-4o-mini` is itself an alias — it happens to resolve to the dated id today, which is luck rather than a guarantee. Providers deprecate names often, so check the current list before running. Drop `--limit 1` once you're past smoke-testing and ready to run the full 40-item set.
 
 On Windows, pass the task as a path relative to the repo root as shown. An absolute path
 raises `NotImplementedError: Non-relative patterns are unsupported` from Inspect's task
@@ -47,6 +47,11 @@ once, so results come from several passes pooled together:
 ```bash
 python -m hup.pool runs/d5/*.eval
 ```
+
+Google needs throttling. At the default 10 concurrent connections `gemini` returns
+`ServerError` often enough that a sample exhausts its retries and takes the task down
+with it, cancelling whatever else was in flight. Pass `--max-connections 5` for that
+provider; the other two run fine at the default.
 
 Passes are separate `inspect eval` runs, not `--epochs`. Inspect's epoch reducers keep
 `metadata` from the first epoch only, and every metric here reads metadata, so epochs

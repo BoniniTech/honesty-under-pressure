@@ -47,10 +47,20 @@ from hup.task import DEFAULT_MAX_TOKENS, DEFAULT_TOKEN_LIMIT
 # sweep whose measured figure is 350,328, an 82% understatement. Pooling models with
 # means from 360 to 2,047 into one median made it worse still.
 OBSERVED_MEAN_TOKENS_PER_SAMPLE: dict[str, int] = {
-    "openai/gpt-4o-mini": 360,
+    "openai/gpt-4o-mini-2024-07-18": 360,
     "anthropic/claude-haiku-4-5-20251001": 512,
-    "google/gemini-flash-latest": 2_047,
+    "google/gemini-3.6-flash": 2_047,
 }
+
+# Model ids here are pinned versions, never floating aliases, and that is a correctness
+# requirement rather than a style preference. The pilot ran `google/gemini-flash-latest`,
+# which resolved to `gemini-3.6-flash` on 2026-08-12 and to `gemini-3.7-flash` a week
+# later. Every gemini figure recorded from that pilot describes 3.6, so an alias in this
+# table would attach a measurement to whichever model answers next.
+#
+# `gpt-4o-mini` is the same hazard wearing a less obvious name. It resolved to
+# `gpt-4o-mini-2024-07-18` on both dates, so it had not moved yet, but nothing stops it.
+# All three ids here were run on 2026-08-19 and each resolved to itself.
 
 # An unmeasured model is assumed to behave like the most expensive one measured. Guessing
 # low here produces a budget that is approved and then exceeded, which is the failure this
