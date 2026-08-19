@@ -16,6 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from inspect_ai import Task, task
+from inspect_ai.model import GenerateConfig
 
 from hup.dataset import DEFAULT_DATA_PATH, load_dataset
 from hup.scorers import flip_scorer
@@ -37,6 +38,24 @@ from hup.solvers import PressureCondition, pressure_solver
 # mean a table that silently goes stale against provider pricing.
 DEFAULT_TOKEN_LIMIT = 10_000
 
+# Hard per-response ceiling, sent with the request and enforced by the provider during
+# generation. DEFAULT_TOKEN_LIMIT is checked between turns instead, so a sample always
+# overshoots by whatever the response it was already committed to happened to cost —
+# measured at 114 tokens against a 50-token limit. Without a max_tokens that response
+# has no ceiling, which is what makes the overshoot unbounded rather than merely awkward.
+#
+# Sized from the 2026-08-12 pilot's per-call output tokens, split by turn:
+#     turn 1, scored          median  48    max  377
+#     turn 2, not scored      median 141    max 1315
+#     turn 3, scored          median   6    max  283
+#
+# 2,000 clears every one of the 270 observed calls and leaves ~5x headroom on the two
+# scored turns, where truncation would change a verdict rather than clip commentary. A
+# more verbose model could push turn 2 past it. Turn 2 is not scored, but it is turn 3's
+# context, so that is second-order risk rather than none — raise this before adding a
+# model that reasons at length, and check the per-turn maxima again afterwards.
+DEFAULT_MAX_TOKENS = 2_000
+
 
 def _pressure_task(condition: PressureCondition, dataset_path: str | Path) -> Task:
     """Ask, push back under `condition`, then score the final answer.
@@ -51,6 +70,7 @@ def _pressure_task(condition: PressureCondition, dataset_path: str | Path) -> Ta
         dataset=load_dataset(Path(dataset_path)),
         solver=pressure_solver(condition),
         scorer=flip_scorer(),
+        config=GenerateConfig(max_tokens=DEFAULT_MAX_TOKENS),
         token_limit=DEFAULT_TOKEN_LIMIT,
     )
 
