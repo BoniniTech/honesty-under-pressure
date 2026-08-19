@@ -8,12 +8,12 @@ the README are regenerable from a clean clone instead of hand-typed.
 
     python -m hup.budget --models openai/gpt-4o-mini anthropic/claude-haiku-4-5-20251001
 
-The worst case is a planning figure, not a hard ceiling. `token_limit` is checked
-after a generate call returns, not mid-stream, so a sample overshoots by up to one
-model response: a 50-token limit measured against gpt-4o-mini stopped a sample at
-114 tokens. The overshoot is proportionally small at the default limit and large at
-a tiny one. The observed figure is measured, not predicted, and carries whatever the
-pilot's models and phrasing happened to do.
+Three figures, and the difference between them matters. The observed case is measured
+from the pilot and carries that run's models and phrasing. The worst case is the
+planning figure, `samples x token_limit`. The ceiling is the number a sample cannot
+exceed: `token_limit` is checked between turns rather than mid-generation, so a sample
+always overshoots by the response it was already committed to, and `max_tokens` is what
+bounds that response. Without a `max_tokens` there is no ceiling to compute.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from typing import get_args
 
 from hup.dataset import DEFAULT_DATA_PATH, load_questions
 from hup.solvers import TURNS_PER_SAMPLE, PressureCondition
-from hup.task import DEFAULT_TOKEN_LIMIT
+from hup.task import DEFAULT_MAX_TOKENS, DEFAULT_TOKEN_LIMIT
 
 # Median total tokens per sample over the 90-sample stage-3 concise arm, all three
 # turns summed: haiku 512, gpt-4o-mini 319, gemini-flash-latest 1,939. Measured, not
@@ -42,6 +42,7 @@ class SweepEstimate:
     conditions: int
     models: int
     token_limit: int
+    max_tokens: int
     observed_median_tokens: int
 
     @property
@@ -54,13 +55,32 @@ class SweepEstimate:
 
     @property
     def worst_case_tokens(self) -> int:
-        """Planning bound, not a hard ceiling.
+        """Planning figure: what a sweep costs if every sample runs to its token limit.
 
-        `token_limit` is checked after each generate returns, so a sample can exceed it
-        by one model response. Measured: a 50-token limit stopped a sample at 114 tokens.
-        Treat this as the figure to budget against, not a guarantee.
+        Not a guarantee — see `ceiling_tokens` for the number a sweep cannot exceed.
         """
         return self.samples * self.token_limit
+
+    @property
+    def overshoot_per_sample(self) -> int:
+        """How far one sample can exceed `token_limit` before it is stopped.
+
+        The limit is checked between turns, so the final response completes and is billed
+        in full. That response costs at most `max_tokens` of output, and its input is the
+        conversation so far, itself bounded by the earlier capped responses. `turns x
+        max_tokens` covers both. Excludes the scripted prompt text, which is tens of
+        tokens per call and does not scale with anything.
+        """
+        return TURNS_PER_SAMPLE * self.max_tokens
+
+    @property
+    def ceiling_tokens(self) -> int:
+        """Upper bound a sweep cannot exceed, give or take the prompt text.
+
+        Computable only because `max_tokens` bounds the overshoot. With `max_tokens`
+        unset the provider default applies and this number does not exist.
+        """
+        return self.samples * (self.token_limit + self.overshoot_per_sample)
 
     @property
     def observed_case_tokens(self) -> int:
@@ -73,6 +93,7 @@ def estimate_sweep(
     models: int,
     dataset_path: Path = DEFAULT_DATA_PATH,
     token_limit: int = DEFAULT_TOKEN_LIMIT,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
     observed_median_tokens: int = OBSERVED_MEDIAN_TOKENS_PER_SAMPLE,
 ) -> SweepEstimate:
     """Size a full sweep from the live dataset and the declared pressure conditions.
@@ -84,12 +105,15 @@ def estimate_sweep(
         raise ValueError(f"models must be at least 1, got {models}")
     if token_limit < 1:
         raise ValueError(f"token_limit must be at least 1, got {token_limit}")
+    if max_tokens < 1:
+        raise ValueError(f"max_tokens must be at least 1, got {max_tokens}")
 
     return SweepEstimate(
         questions=len(load_questions(dataset_path)),
         conditions=len(get_args(PressureCondition)),
         models=models,
         token_limit=token_limit,
+        max_tokens=max_tokens,
         observed_median_tokens=observed_median_tokens,
     )
 
@@ -108,9 +132,13 @@ def format_estimate(estimate: SweepEstimate) -> str:
             f"  (at {estimate.observed_median_tokens:,} median/sample, pilot 2026-08-12)",
             f"worst-case tokens  {estimate.worst_case_tokens:,}"
             f"  ({estimate.token_limit:,} token limit x {estimate.samples:,} samples)",
-            "                   limits are checked between turns, so a sample can overshoot",
-            "                   by one model response; budget against this, do not treat it",
-            "                   as a guarantee.",
+            f"ceiling tokens     {estimate.ceiling_tokens:,}"
+            f"  (+{estimate.overshoot_per_sample:,}/sample overshoot, bounded by"
+            f" max_tokens={estimate.max_tokens:,})",
+            "",
+            "Limits are checked between turns, so a sample is billed for the response it had",
+            "already committed to. max_tokens bounds that response, which is what makes the",
+            "ceiling a real number. It excludes the scripted prompt text, tens of tokens/call.",
             "",
             "Token counts only. Convert with current provider pricing before approving a run;",
             "this repo keeps no price table, because a stale one understates the bill silently.",
@@ -139,10 +167,19 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_TOKEN_LIMIT,
         help=f"Per-sample token ceiling to assume (default {DEFAULT_TOKEN_LIMIT:,}).",
     )
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=DEFAULT_MAX_TOKENS,
+        help=f"Per-response output ceiling to assume (default {DEFAULT_MAX_TOKENS:,}).",
+    )
     args = parser.parse_args(argv)
 
     estimate = estimate_sweep(
-        models=len(args.models), dataset_path=args.dataset, token_limit=args.token_limit
+        models=len(args.models),
+        dataset_path=args.dataset,
+        token_limit=args.token_limit,
+        max_tokens=args.max_tokens,
     )
     print(format_estimate(estimate))
     return 0

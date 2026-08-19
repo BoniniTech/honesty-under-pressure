@@ -54,10 +54,24 @@ is **not** a budget for the run. Inspect has no run-level cap — every limit it
 per-sample — so a sweep costs about `samples x token_limit` at worst, and the only
 run-scoped control is `--limit`, which caps how many samples execute.
 
-The limit is checked between turns rather than mid-generation, so a sample overshoots by
-up to one model response before it stops. Verified against `gpt-4o-mini`: a 50-token limit
-halted a sample after one turn instead of three, having used 114 tokens. Budget against
-`samples x token_limit`, but do not read it as a guarantee.
+The limit is checked between turns rather than mid-generation, so a sample is billed for
+the response it had already committed to. Verified against `gpt-4o-mini`: a 50-token limit
+halted a sample after one turn instead of three, having used 114 tokens.
+
+A second cap bounds that overshoot. `DEFAULT_MAX_TOKENS` (also `src/hup/task.py`,
+overridable with `--max-tokens`) is sent with the request and enforced by the provider
+*during* generation, so no single response can exceed it. The two do different jobs:
+
+| | `token_limit` | `max_tokens` |
+|---|---|---|
+| enforced by | Inspect, between turns | the provider, during generation |
+| counts | input + output, whole sample | output, one response |
+| catches | turns that add up to too much | one response that runs away |
+| can overshoot | yes, by one response | no |
+
+Together they give a sweep a real upper bound — `samples x (token_limit + turns x
+max_tokens)` — which `python -m hup.budget` reports as `ceiling tokens`. Without
+`max_tokens` that number does not exist, because the overshoot has no size.
 
 `--cost-limit` is deliberately not used here. Inspect records cost only when a model
 carries price data, and all three target models ship none, so the check never runs and the
