@@ -61,7 +61,14 @@ python -m hup.budget --models openai/gpt-4o-mini anthropic/claude-haiku-4-5-2025
 ```
 
 It derives the question count from `data/questions.jsonl` and the condition count from
-the solver, so it cannot describe a sweep other than the one about to run.
+the solver, so it cannot describe a sweep other than the one about to run, and it
+projects spend per model from measured means rather than one blended figure. The models
+differ by more than 5x per sample, so a blended average describes none of them.
+
+Nothing in this repo stops a run once it starts. The backstop that actually fires is the
+provider account, and it fires partway through — leaving a pass that covered some
+questions and not others. `python -m hup.pool` refuses such a pass rather than pooling
+it, since a partial sweep weights whichever items ran first.
 
 Each sample carries a per-sample `token_limit` (`DEFAULT_TOKEN_LIMIT` in
 `src/hup/task.py`), overridable with `--token-limit`. That bounds one runaway sample; it
