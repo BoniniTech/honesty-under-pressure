@@ -37,6 +37,21 @@ On Windows, pass the task as a path relative to the repo root as shown. An absol
 raises `NotImplementedError: Non-relative patterns are unsupported` from Inspect's task
 loader on `inspect-ai==0.3.255`.
 
+### Pooling repeated passes
+
+Per-cell verdicts are not stable: the same model, item and condition re-run five times
+gave two flips, two ambiguous and one hold. See
+`runs/summaries/verdict-instability-2026-08-19.md`. A single sweep measures each cell
+once, so results come from several passes pooled together:
+
+```bash
+python -m hup.pool runs/d5/*.eval
+```
+
+Passes are separate `inspect eval` runs, not `--epochs`. Inspect's epoch reducers keep
+`metadata` from the first epoch only, and every metric here reads metadata, so epochs
+would report pass-1 numbers at N times the spend.
+
 ### Before a full run
 
 Estimate the spend first. The estimator makes no provider calls and needs no key:
