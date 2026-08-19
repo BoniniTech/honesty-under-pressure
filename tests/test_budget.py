@@ -32,6 +32,7 @@ from hup.budget import (
 )
 from hup.solvers import TURNS_PER_SAMPLE, PressureCondition
 from hup.task import (
+    DEFAULT_MAX_TOKENS,
     DEFAULT_TOKEN_LIMIT,
     authority_appeal,
     confidence_social,
@@ -64,6 +65,28 @@ def test_every_task_carries_the_default_token_limit(task_fn: object, tmp_path: P
     assert built.token_limit == DEFAULT_TOKEN_LIMIT
 
 
+@pytest.mark.parametrize("task_fn", _TASKS)
+def test_every_task_caps_output_per_response(task_fn: object, tmp_path: Path) -> None:
+    """max_tokens is what bounds the overshoot on token_limit. Losing it puts the per
+    response ceiling back to whatever each provider defaults to, and the estimate's
+    ceiling figure silently stops being true."""
+    built = task_fn(dataset_path=_dataset(tmp_path / f"{task_fn.__name__}-mt.jsonl", 1))  # type: ignore[operator,attr-defined]
+    assert built.config.max_tokens == DEFAULT_MAX_TOKENS
+
+
+def test_max_tokens_clears_every_observed_call() -> None:
+    """Largest single response in the 2026-08-12 pilot was 1,315 output tokens, on the
+    unscored turn 2. The scored turns peaked at 377 and 283."""
+    assert DEFAULT_MAX_TOKENS > 1_315
+
+
+def test_max_tokens_leaves_headroom_on_the_scored_turns() -> None:
+    """Truncating turn 1 or turn 3 changes a verdict rather than clipping commentary, so
+    the cap has to sit well clear of what those turns actually produce."""
+    largest_scored_turn = 377
+    assert DEFAULT_MAX_TOKENS >= largest_scored_turn * 5
+
+
 def test_default_token_limit_clears_the_observed_worst_case() -> None:
     """The pilot's worst sample was 3,964 tokens. A cap at or under that would truncate
     legitimate answers and score the truncation as model behaviour."""
@@ -94,11 +117,37 @@ def test_worst_case_is_the_per_sample_limit_times_samples() -> None:
         conditions=3,
         models=3,
         token_limit=10_000,
+        max_tokens=2_000,
         observed_median_tokens=536,
     )
     assert estimate.samples == 360
     assert estimate.worst_case_tokens == 3_600_000
     assert estimate.observed_case_tokens == 360 * 536
+
+
+def test_ceiling_adds_a_bounded_overshoot_to_the_worst_case() -> None:
+    """The limit is checked between turns, so a sample is billed for the response it had
+    already committed to. max_tokens is what bounds that response."""
+    estimate = SweepEstimate(
+        questions=40,
+        conditions=3,
+        models=3,
+        token_limit=10_000,
+        max_tokens=2_000,
+        observed_median_tokens=536,
+    )
+    assert estimate.overshoot_per_sample == TURNS_PER_SAMPLE * 2_000
+    assert estimate.ceiling_tokens == 360 * (10_000 + 6_000)
+    assert estimate.ceiling_tokens > estimate.worst_case_tokens
+
+
+def test_ceiling_scales_with_max_tokens_not_just_the_limit() -> None:
+    """If max_tokens stopped feeding the ceiling, the overshoot would silently vanish
+    from the estimate and the number would look like a guarantee it is not."""
+    loose = estimate_sweep(models=1, max_tokens=4_000)
+    tight = estimate_sweep(models=1, max_tokens=500)
+    assert loose.ceiling_tokens > tight.ceiling_tokens
+    assert loose.worst_case_tokens == tight.worst_case_tokens
 
 
 def test_observed_case_is_far_below_the_ceiling() -> None:
@@ -114,6 +163,7 @@ def test_observed_case_is_far_below_the_ceiling() -> None:
         ({"models": 0}, "models must be at least 1"),
         ({"models": -1}, "models must be at least 1"),
         ({"models": 1, "token_limit": 0}, "token_limit must be at least 1"),
+        ({"models": 1, "max_tokens": 0}, "max_tokens must be at least 1"),
     ],
 )
 def test_rejects_impossible_configurations(kwargs: dict, message: str) -> None:
@@ -129,13 +179,15 @@ def test_format_reports_both_cases_and_refuses_to_quote_dollars() -> None:
     assert "$" not in text
 
 
-def test_format_does_not_claim_the_worst_case_is_a_guarantee() -> None:
-    """Limits are checked between turns, so a sample overshoots by up to one response.
-    Measured against gpt-4o-mini: a 50-token limit stopped a sample at 114 tokens. An
-    earlier revision of this module called the figure a ceiling, which was wrong."""
+def test_format_separates_the_planning_figure_from_the_real_ceiling() -> None:
+    """Three numbers that mean different things, and conflating them is how a budget
+    conversation goes wrong. An earlier revision reported the worst case alone and called
+    it a ceiling, which was measurably false: a 50-token limit billed 114 tokens."""
     text = format_estimate(estimate_sweep(models=3))
+    assert "observed tokens" in text
+    assert "worst-case tokens" in text
+    assert "ceiling tokens" in text
     assert "overshoot" in text
-    assert "ceiling" not in text.lower()
 
 
 # runpy re-executes an already-imported module, so it warns that state could diverge
