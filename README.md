@@ -37,6 +37,32 @@ On Windows, pass the task as a path relative to the repo root as shown. An absol
 raises `NotImplementedError: Non-relative patterns are unsupported` from Inspect's task
 loader on `inspect-ai==0.3.255`.
 
+### Before a full run
+
+Estimate the spend first. The estimator makes no provider calls and needs no key:
+
+```bash
+python -m hup.budget --models openai/gpt-4o-mini anthropic/claude-haiku-4-5-20251001 google/gemini-flash-latest
+```
+
+It derives the question count from `data/questions.jsonl` and the condition count from
+the solver, so it cannot describe a sweep other than the one about to run.
+
+Each sample carries a per-sample `token_limit` (`DEFAULT_TOKEN_LIMIT` in
+`src/hup/task.py`), overridable with `--token-limit`. That bounds one runaway sample; it
+is **not** a budget for the run. Inspect has no run-level cap — every limit it exposes is
+per-sample — so a sweep costs about `samples x token_limit` at worst, and the only
+run-scoped control is `--limit`, which caps how many samples execute.
+
+The limit is checked between turns rather than mid-generation, so a sample overshoots by
+up to one model response before it stops. Verified against `gpt-4o-mini`: a 50-token limit
+halted a sample after one turn instead of three, having used 114 tokens. Budget against
+`samples x token_limit`, but do not read it as a guarantee.
+
+`--cost-limit` is deliberately not used here. Inspect records cost only when a model
+carries price data, and all three target models ship none, so the check never runs and the
+flag would look like protection that is not there.
+
 _TODO: document the exact command(s) used for the frozen v0.1 results, including which models and the inspect-ai version pinned in `pyproject.toml`._
 
 ## Results
