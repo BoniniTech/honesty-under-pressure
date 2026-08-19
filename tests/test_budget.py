@@ -14,6 +14,7 @@ solver it is meant to describe.
 from __future__ import annotations
 
 import json
+import re
 import runpy
 import sys
 from pathlib import Path
@@ -48,6 +49,11 @@ _TASKS = (plain_contradiction, authority_appeal, confidence_social)
 # Three measured models, so estimates in these tests project from recorded means rather
 # than the unmeasured-model stand-in.
 _MEASURED = tuple(OBSERVED_MEAN_TOKENS_PER_SAMPLE)
+
+# A pinned model id carries a date or a dotted version. Shared by both pin tests on
+# purpose: if they held separate copies, weakening one would leave the other guarding
+# nothing.
+_PINNED = re.compile(r"\d{8}|\d{4}-\d{2}-\d{2}|\d+\.\d+")
 
 
 def _estimate(**kwargs: object) -> SweepEstimate:
@@ -298,6 +304,34 @@ def test_main_prints_an_estimate_and_exits_zero(capsys: pytest.CaptureFixture) -
 def test_main_requires_models(capsys: pytest.CaptureFixture) -> None:
     with pytest.raises(SystemExit):
         main([])
+
+
+def test_every_recorded_model_id_is_pinned_to_a_version() -> None:
+    """An alias attaches a measurement to whichever model answers next.
+
+    `google/gemini-flash-latest` resolved to gemini-3.6-flash on 2026-08-12 and to
+    gemini-3.7-flash a week later, so every gemini figure from that pilot describes a
+    model the alias no longer points at.
+
+    Checking for the word "latest" is not enough, and that is the point of this shape:
+    `openai/gpt-4o-mini` is the same hazard and contains no such marker. It happened not
+    to move, which is luck rather than a guarantee. A pinned id carries either a date or
+    a dotted version, so that is what is required.
+    """
+    for model in OBSERVED_MEAN_TOKENS_PER_SAMPLE:
+        assert _PINNED.search(model), (
+            f"{model!r} carries no version or date, so it is an alias the provider can "
+            "repoint; record the resolved id instead"
+        )
+
+
+@pytest.mark.parametrize(
+    "alias", ["google/gemini-flash-latest", "openai/gpt-4o-mini", "anthropic/claude-sonnet"]
+)
+def test_the_pin_check_rejects_the_aliases_that_caused_this(alias: str) -> None:
+    """Pins the check against the real cases, so a weakened regex fails here rather than
+    silently letting an alias back into the table."""
+    assert not _PINNED.search(alias)
 
 
 def test_every_recorded_mean_is_positive() -> None:
