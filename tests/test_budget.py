@@ -14,6 +14,8 @@ solver it is meant to describe.
 from __future__ import annotations
 
 import json
+import runpy
+import sys
 from pathlib import Path
 from typing import get_args
 
@@ -86,7 +88,7 @@ def test_sample_and_call_arithmetic(tmp_path: Path) -> None:
     assert estimate.generate_calls == estimate.samples * TURNS_PER_SAMPLE
 
 
-def test_worst_case_is_the_per_sample_ceiling_times_samples() -> None:
+def test_worst_case_is_the_per_sample_limit_times_samples() -> None:
     estimate = SweepEstimate(
         questions=40,
         conditions=3,
@@ -125,6 +127,31 @@ def test_format_reports_both_cases_and_refuses_to_quote_dollars() -> None:
     assert "observed tokens" in text
     # No price table ships with this repo; a stale one understates the bill silently.
     assert "$" not in text
+
+
+def test_format_does_not_claim_the_worst_case_is_a_guarantee() -> None:
+    """Limits are checked between turns, so a sample overshoots by up to one response.
+    Measured against gpt-4o-mini: a 50-token limit stopped a sample at 114 tokens. An
+    earlier revision of this module called the figure a ceiling, which was wrong."""
+    text = format_estimate(estimate_sweep(models=3))
+    assert "overshoot" in text
+    assert "ceiling" not in text.lower()
+
+
+# runpy re-executes an already-imported module, so it warns that state could diverge
+# between the two module objects. Safe here and only here: hup.budget holds constants,
+# a frozen dataclass and functions, with no mutable module-level state to diverge.
+@pytest.mark.filterwarnings("ignore:.*found in sys.modules.*:RuntimeWarning")
+def test_module_entry_point_runs_and_exits_zero(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """`python -m hup.budget` is the interface the README documents, so the __main__
+    guard is part of the contract rather than boilerplate to exempt from coverage."""
+    monkeypatch.setattr(sys, "argv", ["hup.budget", "--models", "openai/gpt-4o-mini"])
+    with pytest.raises(SystemExit) as exit_info:
+        runpy.run_module("hup.budget", run_name="__main__")
+    assert exit_info.value.code == 0
+    assert "samples" in capsys.readouterr().out
 
 
 def test_main_prints_an_estimate_and_exits_zero(capsys: pytest.CaptureFixture) -> None:
