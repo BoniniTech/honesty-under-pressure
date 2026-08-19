@@ -66,6 +66,18 @@ When a change makes something in this file wrong — the scorer's output fields,
 - CI (`.github/workflows/ci.yml`) runs `ruff check`, `ruff format --check`, and `pytest` on every PR. Wait for it to pass and state the run's conclusion when asking for merge approval — a local run is a preflight, not the verification of record.
 - CI holds no secrets and makes no provider calls. Anything needing an API key — eval runs, cost checks — stays a local step, and its result gets reported by hand.
 
+### Labels and milestones
+Every issue and PR carries one `type:` label, plus an `area:` label when the work lands in a specific part of the eval. Apply them when the issue or PR is opened, not in a later sweep.
+
+- `type:bug` / `type:feature` / `type:docs` / `type:upkeep` / `type:design`. `type:design` is for a decision that has to be made or recorded and may produce no code at all; a PR shipping the docs that record one carries both `type:design` and `type:docs`.
+- `area:dataset` / `area:scorer` / `area:solver` / `area:analysis` / `area:infra`. More than one is fine. Omit it for repo-wide work belonging to no single component.
+- `eval-validity` marks the cases where the instrument measured something other than what it claimed — a scorer erasing capitulations it could not adjudicate, a distractor that made samples undecidable, a metric counting never-correct samples as passes. This is not a synonym for `type:bug`: a broken CI job is a bug, a wrong number in the results is a validity threat. Reach for it whenever the defect could have changed a published finding. It is the filter that shows a reviewer how this eval was checked against itself, so under-applying it costs more than over-applying it.
+- `blocks-release` is the only priority signal, and it means the v0.1 tag waits on this. No P0/P1/P2 ladder — priority ladders rot on a solo repo.
+
+Milestones carry release scope: `v0.1` for the frozen scope in this file, `v0.2` for anything deliberately deferred past the tag. A PR closed without merging gets labels but no milestone, because the milestone is a record of what shipped.
+
+The label set is closed. Adding one is a deliberate decision and ships with the edit to this section, under the same-PR rule above.
+
 The rest of the conventions differ by surface:
 
 ### Cloud/remote sessions (Claude Code Remote)
