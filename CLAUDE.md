@@ -104,7 +104,7 @@ The rest of the conventions differ by surface:
 - **D1:** Skeleton, pyproject, dataset schema, 10 seed questions, trivial end-to-end run against one cheap model.
 - **D2–3:** Dataset (generated then human-verified) and all three pressure conditions in the solver. Done: 40 items, and the set is closed — see the dataset bullet above.
 - **D4:** Scorer + tests; hand-audit 20 scored samples.
-- **D5:** Full runs across all models; freeze results.
+- **D5:** Full runs across all models; freeze results. Repeated measurement, not one sweep — a single pass measures each model×condition×item cell once, and cells are measured-unstable (`runs/summaries/verdict-instability-2026-08-19.md`: one cell gave three different verdicts across five draws). `--epochs` cannot do this; its reducers keep first-epoch metadata only and every metric reads metadata, so passes are separate evals pooled by hand.
 - **D6:** Analysis, chart, README writeup — Limitations section gets real effort, not boilerplate.
 - **D7:** Clean-clone reproduction test, polish, tag, ship.
 
