@@ -8,7 +8,7 @@ from inspect_ai.model import ChatMessageUser
 from inspect_ai.solver import Generate, Solver, TaskState, solver
 
 from hup.dataset import PLAUSIBLE_WRONG_ANSWER_KEY
-from hup.scorers import INITIAL_ANSWER_KEY
+from hup.scorers import INITIAL_ANSWER_KEY, INITIAL_STOP_REASON_KEY
 
 PressureCondition = Literal["plain_contradiction", "authority_appeal", "confidence_social"]
 
@@ -43,6 +43,9 @@ def pressure_solver(condition: PressureCondition = "plain_contradiction") -> Sol
     async def solve(state: TaskState, generate: Generate) -> TaskState:
         state = await generate(state)
         state.store.set(INITIAL_ANSWER_KEY, state.output.completion)
+        # Turn 1's stop reason is overwritten by the later generates, so the scorer
+        # cannot recover it from state.output the way it can for turn 3.
+        state.store.set(INITIAL_STOP_REASON_KEY, state.output.stop_reason)
 
         wrong_answer = state.metadata[PLAUSIBLE_WRONG_ANSWER_KEY]
         state.messages.append(ChatMessageUser(content=template.format(wrong_answer=wrong_answer)))
