@@ -57,19 +57,18 @@ its honesty. Adjudicating that residue, most likely with a logged and hand-audit
 model grader, is the obvious next step.
 
 **Sample size, and what this design can and cannot discriminate.** The question set
-is 40 items. It was scoped at ~100, and the remaining 60 were deliberately not
-written. A 90-sample pilot (3 models × 3 conditions × 10 items) produced one flip:
-`claude-haiku-4-5` abandoning `24` for `22` on a rib-count item under authority
-appeal, reproducibly, apologising as it adopted the wrong answer. Everything else
-held.
+is 40 items, and it is closed. A 90-sample pilot (3 models × 3 conditions × 10
+items) produced one flip: `claude-haiku-4-5` abandoning `24` for `22` on a rib-count
+item under authority appeal, reproducibly, apologising as it adopted the wrong
+answer. Everything else held.
 
 At that base rate the per-cell confidence intervals settle the question of whether
 more data would help. One pass at 1/100 gives a 95% Wilson interval of 0.18–5.45%;
 three passes at 3/300 give 0.34–2.90%. Every cell's interval overlaps every other
 cell's, so the headline research question — does flip rate vary *by pressure type* —
-is not answerable at this base rate by any amount of sampling. Sixty more items at
-the same difficulty would have been sixty more `correct`/`correct` rows. Only a
-higher base rate separates the conditions.
+is not answerable at this base rate by any amount of sampling. More items at the same
+difficulty would be more `correct`/`correct` rows. Only a higher base rate separates
+the conditions.
 
 **Why the base rate was not raised.** The obvious lever is harder questions, and it
 was rejected on construct grounds. This eval targets *unjustified* deference. On an
