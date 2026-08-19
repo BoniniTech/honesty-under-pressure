@@ -33,7 +33,10 @@ from hup.budget import (
 )
 from hup.solvers import TURNS_PER_SAMPLE, PressureCondition
 from hup.task import (
+    DEFAULT_MAX_RETRIES,
     DEFAULT_MAX_TOKENS,
+    DEFAULT_REQUEST_TIMEOUT,
+    DEFAULT_TIME_LIMIT,
     DEFAULT_TOKEN_LIMIT,
     authority_appeal,
     confidence_social,
@@ -82,6 +85,38 @@ def test_every_task_caps_output_per_response(task_fn: object, tmp_path: Path) ->
     ceiling figure silently stops being true."""
     built = task_fn(dataset_path=_dataset(tmp_path / f"{task_fn.__name__}-mt.jsonl", 1))  # type: ignore[operator,attr-defined]
     assert built.config.max_tokens == DEFAULT_MAX_TOKENS
+
+
+@pytest.mark.parametrize("task_fn", _TASKS)
+def test_every_task_bounds_how_long_it_can_hang(task_fn: object, tmp_path: Path) -> None:
+    """Inspect leaves retries and clocks unset, and unlimited retries is what turned one
+    stalled sample into a 2h23m run that neither finished nor failed. Each of these has
+    to be present or that failure mode comes back."""
+    built = task_fn(dataset_path=_dataset(tmp_path / f"{task_fn.__name__}-hang.jsonl", 1))  # type: ignore[operator,attr-defined]
+    assert built.config.timeout == DEFAULT_REQUEST_TIMEOUT
+    assert built.config.max_retries == DEFAULT_MAX_RETRIES
+    assert built.time_limit == DEFAULT_TIME_LIMIT
+
+
+def test_retries_are_bounded_not_unlimited() -> None:
+    """`max_retries=None` is Inspect's default and means unlimited. A None here would
+    restore the exact hang this guards against while every other assertion still passed."""
+    assert DEFAULT_MAX_RETRIES is not None
+    assert 0 < DEFAULT_MAX_RETRIES < 100
+
+
+def test_a_request_timeout_is_shorter_than_the_sample_clock() -> None:
+    """Ordered so the innermost bound fires first. If a single request could outlast the
+    sample's wall clock, the sample would die before the request ever reported a failure,
+    and the log would blame the wrong thing."""
+    assert DEFAULT_REQUEST_TIMEOUT < DEFAULT_TIME_LIMIT
+
+
+def test_the_bounds_clear_observed_runtimes() -> None:
+    """A whole 40-sample condition finished in 26s for gpt-4o-mini and 48s for haiku, so
+    these fire on a stall and never on a slow-but-working run."""
+    slowest_observed_condition_seconds = 48
+    assert DEFAULT_TIME_LIMIT > slowest_observed_condition_seconds * 5
 
 
 def test_max_tokens_clears_every_observed_call() -> None:

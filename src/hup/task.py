@@ -56,6 +56,32 @@ DEFAULT_TOKEN_LIMIT = 10_000
 # model that reasons at length, and check the per-turn maxima again afterwards.
 DEFAULT_MAX_TOKENS = 2_000
 
+# Three bounds on how long a run may take, because Inspect leaves all three unset and a
+# run with none of them can hang forever rather than fail. Measured on 2026-08-19: a
+# gemini-flash sweep completed 39 of 40 samples in one condition, stalled on the 40th,
+# and sat there for 2h23m using 25 seconds of CPU. `max_retries` defaults to unlimited,
+# so the retry loop had no exit, and no clock was running to end it. The run neither
+# finished nor failed. See runs/summaries/retry-hang-2026-08-19.md.
+#
+# Each bound catches something the others do not:
+#
+#   timeout      one API request that never returns. The innermost failure, and the one
+#                that was probably happening here.
+#   max_retries  a request that keeps failing and keeps being retried. Bounds the loop
+#                itself, which is what was actually unbounded.
+#   time_limit   anything else that stalls a sample. Wall clock, and deliberately not
+#                `working_limit` — working time excludes waiting on retries by
+#                definition, so it cannot see the failure above.
+#
+# Values are loose on purpose. Observed responses return in seconds and a whole
+# 40-sample condition finishes in well under a minute for the fast models, so these fire
+# only on a genuine stall, never on a slow-but-working run. time_limit is the loosest
+# because wall clock includes queueing behind connection limits, which scales with how
+# many samples run at once.
+DEFAULT_REQUEST_TIMEOUT = 120
+DEFAULT_MAX_RETRIES = 5
+DEFAULT_TIME_LIMIT = 600
+
 
 def _pressure_task(condition: PressureCondition, dataset_path: str | Path) -> Task:
     """Ask, push back under `condition`, then score the final answer.
@@ -64,14 +90,20 @@ def _pressure_task(condition: PressureCondition, dataset_path: str | Path) -> Ta
     through from the command line as strings.
 
     The token limit is a task default. `--token-limit` on the command line overrides
-    it, so the cap is configurable without editing this file.
+    it, so the cap is configurable without editing this file, and the same holds for
+    `--max-tokens`, `--timeout`, `--max-retries` and `--time-limit`.
     """
     return Task(
         dataset=load_dataset(Path(dataset_path)),
         solver=pressure_solver(condition),
         scorer=flip_scorer(),
-        config=GenerateConfig(max_tokens=DEFAULT_MAX_TOKENS),
+        config=GenerateConfig(
+            max_tokens=DEFAULT_MAX_TOKENS,
+            timeout=DEFAULT_REQUEST_TIMEOUT,
+            max_retries=DEFAULT_MAX_RETRIES,
+        ),
         token_limit=DEFAULT_TOKEN_LIMIT,
+        time_limit=DEFAULT_TIME_LIMIT,
     )
 
 

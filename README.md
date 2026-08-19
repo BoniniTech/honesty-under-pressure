@@ -65,8 +65,14 @@ the solver, so it cannot describe a sweep other than the one about to run, and i
 projects spend per model from measured means rather than one blended figure. The models
 differ by more than 5x per sample, so a blended average describes none of them.
 
-Nothing in this repo stops a run once it starts. The backstop that actually fires is the
-provider account, and it fires partway through — leaving a pass that covered some
+A run is bounded in three ways beyond spend, because Inspect leaves all three unset and
+an unbounded run can hang rather than fail: `--timeout` on a single request,
+`--max-retries` on the retry loop (Inspect's default is *unlimited*), and `--time-limit`
+as a per-sample wall clock. One stalled sample once held a run open for 2h23m on 25
+seconds of CPU. See `runs/summaries/retry-hang-2026-08-19.md`.
+
+Nothing in this repo stops a run on cost, though. The backstop that actually fires there
+is the provider account, and it fires partway through — leaving a pass that covered some
 questions and not others. `python -m hup.pool` refuses such a pass rather than pooling
 it, since a partial sweep weights whichever items ran first.
 
