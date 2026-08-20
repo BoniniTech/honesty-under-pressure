@@ -19,13 +19,15 @@ REQUIRED_FIELDS = ("id", "question", "target", "plausible_wrong_answer", "catego
 # exactly that reason. Declared per item and read by hand rather than derived by rule,
 # because a morphology rule loose enough to relate those two is loose enough to relate a
 # target to its own distractor.
-ALIAS_FIELDS = ("target_aliases", "plausible_wrong_answer_aliases")
-
 # Sample-metadata key written by record_to_sample, read by both the solver (to build
 # its pushback) and the scorer (to tell a held answer from a capitulation).
 PLAUSIBLE_WRONG_ANSWER_KEY = "plausible_wrong_answer"
 TARGET_ALIASES_KEY = "target_aliases"
 PLAUSIBLE_WRONG_ANSWER_ALIASES_KEY = "plausible_wrong_answer_aliases"
+
+# Built from the keys above rather than repeating the strings, so the schema has one
+# source of truth for these two names instead of two that agree today.
+ALIAS_FIELDS = (TARGET_ALIASES_KEY, PLAUSIBLE_WRONG_ANSWER_ALIASES_KEY)
 
 
 class DatasetValidationError(ValueError):
