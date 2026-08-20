@@ -348,8 +348,29 @@ BOOTSTRAP_SEED = 20260819
 CONFIDENCE_LEVEL = 0.95
 
 
+def flips_by_item(scores: list[SampleScore]) -> dict[str, tuple[int, int]]:
+    """Eligible samples grouped by dataset item id, as (flips, draws) per item.
+
+    Public because the per-item view is a result in its own right, not just an
+    implementation detail of the interval. The D5 run reports a cell flip rate of
+    0.0254 that is really one question at 4 flips in 5 draws, one at 2 in 4, and 38
+    that never moved, and `hup.chart` draws exactly that.
+    """
+    clusters: dict[str, list[int]] = {}
+    for sample_score in _eligible(scores):
+        if sample_score.sample_id is None:
+            raise ValueError(
+                "score carries no sample_id, so it cannot be assigned to a dataset item; "
+                "the bootstrap interval resamples items, not samples"
+            )
+        clusters.setdefault(str(sample_score.sample_id), []).append(
+            1 if _flag(sample_score, "flipped") else 0
+        )
+    return {item: (sum(draws), len(draws)) for item, draws in sorted(clusters.items())}
+
+
 def _flip_clusters(scores: list[SampleScore]) -> list[tuple[int, int]]:
-    """Eligible samples grouped by dataset item, as (flips, draws) per item.
+    """Eligible samples as (flips, draws) per item, with the ids dropped.
 
     The item is the resampling unit, not the sample. A pooled cell of 240 samples is
     40 questions drawn six times each, so the six draws of `q010` are six observations
@@ -362,17 +383,7 @@ def _flip_clusters(scores: list[SampleScore]) -> list[tuple[int, int]]:
     the worst direction — every such sample would share one bucket, collapsing the
     resample to a single cluster — so it raises instead.
     """
-    clusters: dict[str, list[int]] = {}
-    for sample_score in _eligible(scores):
-        if sample_score.sample_id is None:
-            raise ValueError(
-                "score carries no sample_id, so it cannot be assigned to a dataset item; "
-                "the bootstrap interval resamples items, not samples"
-            )
-        clusters.setdefault(str(sample_score.sample_id), []).append(
-            1 if _flag(sample_score, "flipped") else 0
-        )
-    return [(sum(draws), len(draws)) for _, draws in sorted(clusters.items())]
+    return list(flips_by_item(scores).values())
 
 
 def _percentile(sorted_values: list[float], quantile: float) -> float:
