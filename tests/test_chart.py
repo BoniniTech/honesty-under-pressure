@@ -8,6 +8,7 @@ well formed, because nothing downstream will notice if either fails.
 
 from __future__ import annotations
 
+import re
 import runpy
 import sys
 import xml.etree.ElementTree as ElementTree
@@ -22,6 +23,7 @@ from hup.chart import (
     _model_label,
     _num,
     _short_condition,
+    axis_max_for,
     cell_results,
     flip_rate_figure,
     flipping_cell,
@@ -190,6 +192,13 @@ class TestPerItemFigure:
         svg = per_item_figure({"q010": (4, 5)}, label="x / y")
         assert "Exploratory" in svg
 
+    def test_no_items_at_all_is_refused(self) -> None:
+        """Previously a bare ZeroDivisionError from the bar-width arithmetic. Not
+        reachable through main, since flipping_cell guarantees at least one flip, but a
+        public function should say what is wrong rather than crash."""
+        with pytest.raises(ValueError, match="no items to draw"):
+            per_item_figure({}, label="x / y")
+
     def test_an_item_with_no_eligible_draws_does_not_divide_by_zero(self) -> None:
         svg = per_item_figure({"q010": (0, 0), "q011": (1, 2)}, label="x / y")
         assert ElementTree.fromstring(svg).tag.endswith("svg")
@@ -249,3 +258,48 @@ class TestMain:
             runpy.run_module("hup.chart", run_name="__main__")
         assert exit_info.value.code == 0
         assert "flip-rate.svg" in capsys.readouterr().out
+
+
+class TestAxisMax:
+    """The axis is derived, because a fixed one breaks silently.
+
+    A cell whose upper bound exceeds the axis draws past the edge of the canvas and its
+    row renders empty, which reads as missing data — the exact misreading the
+    dot-and-interval form was chosen to prevent.
+    """
+
+    def test_the_d5_shape_still_lands_on_a_tenth(self) -> None:
+        """The fix must not move the published figure. Max upper in the D5 run is
+        0.0881, which rounds up to the 0.10 floor."""
+        results = cell_results(_cell("anthropic/x", "authority_appeal", _d5_shaped()))
+        assert axis_max_for(results) == pytest.approx(0.10)
+
+    def test_a_wide_interval_widens_the_axis(self) -> None:
+        wide = CellResult(Cell("m/x", "c"), 240, 60, 0.25, 0.18, 0.32, False)
+        assert axis_max_for([wide]) == pytest.approx(0.32)
+
+    def test_nothing_is_drawn_past_the_canvas(self) -> None:
+        """The bug this replaces: a rate of 0.25 on a fixed 0.10 axis put the point at
+        x=1522 on a 780px canvas."""
+        wide = CellResult(Cell("m/x", "c"), 240, 60, 0.25, 0.18, 0.32, False)
+        svg = flip_rate_figure([wide])
+        width = float(re.search(r'width="([0-9.]+)"', svg).group(1))
+        drawn = [float(x) for x in re.findall(r'<circle cx="([0-9.]+)"', svg)]
+        drawn += [float(x) for x in re.findall(r'x2="([0-9.]+)"', svg)]
+        assert drawn
+        assert max(drawn) <= width
+
+    def test_an_all_zero_table_keeps_a_usable_axis(self) -> None:
+        """Every bound at zero must not collapse the axis to zero width."""
+        empty = CellResult(Cell("m/x", "c"), 240, 0, 0.0, 0.0, 0.0, True)
+        assert axis_max_for([empty]) == pytest.approx(0.10)
+
+    def test_a_nan_bound_does_not_poison_the_axis(self) -> None:
+        nan_cell = CellResult(
+            Cell("m/x", "c"), 0, 0, float("nan"), float("nan"), float("nan"), True
+        )
+        assert axis_max_for([nan_cell]) == pytest.approx(0.10)
+
+    def test_an_explicit_axis_still_wins(self) -> None:
+        wide = CellResult(Cell("m/x", "c"), 240, 60, 0.25, 0.18, 0.32, False)
+        assert "0.50" in flip_rate_figure([wide], axis_max=0.5)
