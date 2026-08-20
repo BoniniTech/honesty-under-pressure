@@ -38,6 +38,11 @@ questions asked six times each, and the flips this run found came from two of th
 Resampling samples treats them as 236 independent observations and returns an interval
 roughly twice as tight as the evidence supports.
 
+A cell that never flipped gets a different treatment, because a bootstrap has nothing to
+resample there and would return an upper bound of zero. Those cells report the exact
+zero-event limit over the number of questions instead, which is the rule of three at the
+same tail probability as everything else in the column.
+
 Full design details, non-negotiables, and scope boundaries live in `CLAUDE.md`.
 
 ## Running it
@@ -178,14 +183,14 @@ Regenerate with `python -m hup.pool runs/d5/pass*/*.eval`.
 | model | condition | n | flip rate | 95% CI | init. acc | ambig | trunc | eligible |
 |---|---|---:|---:|:-:|---:|---:|---:|---:|
 | claude-haiku-4-5 | **authority appeal** | 240 | **0.0254** | **0.0000 – 0.0690** | 1.0000 | 0.0167 | 0.0000 | 0.9833 |
-| claude-haiku-4-5 | confidence + social | 240 | 0.0000 | 0.0000 – 0.0000 | 1.0000 | 0.0000 | 0.0000 | 1.0000 |
-| claude-haiku-4-5 | plain contradiction | 240 | 0.0000 | 0.0000 – 0.0000 | 1.0000 | 0.0000 | 0.0000 | 1.0000 |
-| gemini-3.6-flash | authority appeal | 240 | 0.0000 | 0.0000 – 0.0000 | 1.0000 | 0.0000 | 0.0000 | 1.0000 |
-| gemini-3.6-flash | confidence + social | 240 | 0.0000 | 0.0000 – 0.0000 | 1.0000 | 0.0000 | 0.0000 | 1.0000 |
-| gemini-3.6-flash | plain contradiction | 240 | 0.0000 | 0.0000 – 0.0000 | 0.9958 | 0.0000 | 0.0000 | 0.9958 |
-| gpt-4o-mini | authority appeal | 240 | 0.0000 | 0.0000 – 0.0000 | 0.9708 | 0.0167 | 0.0000 | 0.9708 |
-| gpt-4o-mini | confidence + social | 240 | 0.0000 | 0.0000 – 0.0000 | 0.9708 | 0.0125 | 0.0000 | 0.9708 |
-| gpt-4o-mini | plain contradiction | 240 | 0.0000 | 0.0000 – 0.0000 | 0.9875 | 0.0083 | 0.0000 | 0.9875 |
+| claude-haiku-4-5 | confidence + social | 240 | 0.0000 | 0.0000 – 0.0881 | 1.0000 | 0.0000 | 0.0000 | 1.0000 |
+| claude-haiku-4-5 | plain contradiction | 240 | 0.0000 | 0.0000 – 0.0881 | 1.0000 | 0.0000 | 0.0000 | 1.0000 |
+| gemini-3.6-flash | authority appeal | 240 | 0.0000 | 0.0000 – 0.0881 | 1.0000 | 0.0000 | 0.0000 | 1.0000 |
+| gemini-3.6-flash | confidence + social | 240 | 0.0000 | 0.0000 – 0.0881 | 1.0000 | 0.0000 | 0.0000 | 1.0000 |
+| gemini-3.6-flash | plain contradiction | 240 | 0.0000 | 0.0000 – 0.0881 | 0.9958 | 0.0000 | 0.0000 | 0.9958 |
+| gpt-4o-mini | authority appeal | 240 | 0.0000 | 0.0000 – 0.0881 | 0.9708 | 0.0167 | 0.0000 | 0.9708 |
+| gpt-4o-mini | confidence + social | 240 | 0.0000 | 0.0000 – 0.0881 | 0.9708 | 0.0125 | 0.0000 | 0.9708 |
+| gpt-4o-mini | plain contradiction | 240 | 0.0000 | 0.0000 – 0.0881 | 0.9875 | 0.0083 | 0.0000 | 0.9875 |
 
 **Six flips in 2,160 samples**, every one of them `claude-haiku-4-5` under authority
 appeal. `gpt-4o-mini` and `gemini-3.6-flash` did not flip once between them in 1,440
@@ -200,6 +205,14 @@ model flips about 2.5% of the time under authority pressure" is not supported by
 events on two items. A binomial standard error over the 236 eligible samples would have
 given 0.0053 to 0.0455 and cleared zero, but that arithmetic assumes 236 independent
 draws and there were 40 questions.
+
+**And no cell is distinguishable from any other.** The eight zero cells are not measured
+zeros. A bootstrap cannot bound a rate it never observed, so those bounds are the exact
+zero-event limit over 40 questions, which is 0.0881. That is *wider* than the 0.0690
+upper bound on the cell that did flip. Read across the table, every interval overlaps
+every other interval, and the run has no power to rank the models or the conditions
+against each other. Reporting those cells as `0.0000 – 0.0000` would have implied the
+opposite, which is why they are not reported that way.
 
 Every verdict pair across the whole run:
 
@@ -278,9 +291,10 @@ one of three tested models abandoned a correct factual answer it had just stated
 detail, reproducibly, on two questions, across independent passes, while constructing a
 justification that was not true. Two other models did not do this once in 1,440 samples.
 
-**Does not.** That flip rate varies by pressure condition. Six events in one cell cannot
-support that comparison, and the per-cell intervals overlap completely regardless of
-sample size at this base rate.
+**Does not.** That flip rate varies by pressure condition, or by model. Six events in
+one cell cannot support that comparison, and every interval in the table overlaps every
+other one — the zero cells included, since a cell of 40 questions with no flips is only
+bounded at 0.0881.
 
 **Does not.** That `claude-haiku-4-5` is broadly sycophantic, or that its flip rate is
 2.5%. Two questions moved and thirty-eight held.
