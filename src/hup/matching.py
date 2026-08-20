@@ -9,6 +9,7 @@ undecidable, so a divergence would let exactly those items through.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 
 # Markdown emphasis, removed before matching because `\b` cannot see past it.
 #
@@ -63,3 +64,19 @@ def is_matchable(candidate: str) -> bool:
     if not normalized:
         return False
     return re.match(r"\w", normalized) is not None and re.search(r"\w\Z", normalized) is not None
+
+
+def matches_any(text: str, candidate: str, aliases: Sequence[str] = ()) -> bool:
+    """Whether the answer names `candidate` under any of its accepted surface forms.
+
+    Aliases are declared per item in `questions.jsonl` and verified by hand, rather
+    than derived from a morphology rule. A rule that turns `gravity` into `gravit*`
+    would also turn some other target into a prefix of its own distractor, and the
+    failure mode of a matcher that fires too readily is a flip that never happened.
+
+    Empty aliases is the common case and is not a silent default: a missing alias can
+    only make matching stricter, which drops a sample rather than inventing one.
+    """
+    return normalized_match(text, candidate) or any(
+        normalized_match(text, alias) for alias in aliases
+    )

@@ -13,13 +13,52 @@ DEFAULT_DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "questions.js
 
 REQUIRED_FIELDS = ("id", "question", "target", "plausible_wrong_answer", "category")
 
+# Optional per-item lists of extra surface forms that count as naming a candidate.
+# `gravity` and `gravitational force` are the same answer, and whole-word matching sees
+# two unrelated strings — a correct answer scored `neither` eight times in the D5 run for
+# exactly that reason. Declared per item and read by hand rather than derived by rule,
+# because a morphology rule loose enough to relate those two is loose enough to relate a
+# target to its own distractor.
+ALIAS_FIELDS = ("target_aliases", "plausible_wrong_answer_aliases")
+
 # Sample-metadata key written by record_to_sample, read by both the solver (to build
 # its pushback) and the scorer (to tell a held answer from a capitulation).
 PLAUSIBLE_WRONG_ANSWER_KEY = "plausible_wrong_answer"
+TARGET_ALIASES_KEY = "target_aliases"
+PLAUSIBLE_WRONG_ANSWER_ALIASES_KEY = "plausible_wrong_answer_aliases"
 
 
 class DatasetValidationError(ValueError):
     """Raised when a questions.jsonl record fails schema validation."""
+
+
+def _validated_aliases(record: dict, *, line_no: int) -> dict[str, list[str]]:
+    """Read and check the optional alias lists, returning them defaulted to empty.
+
+    Absent is fine and means the candidate matches only itself. Present but malformed
+    is not: an alias that can never match is a hand-written entry that silently does
+    nothing, which is worse than not having written it.
+    """
+    aliases: dict[str, list[str]] = {}
+    for field in ALIAS_FIELDS:
+        value = record.get(field, [])
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            raise DatasetValidationError(
+                f"line {line_no}: field {field!r} must be a list of strings (id={record['id']!r})"
+            )
+        for alias in value:
+            if not alias.strip():
+                raise DatasetValidationError(
+                    f"line {line_no}: field {field!r} contains an empty alias (id={record['id']!r})"
+                )
+            if not is_matchable(alias):
+                raise DatasetValidationError(
+                    f"line {line_no}: alias {alias!r} in {field!r} starts or ends with a "
+                    f"non-word character (id={record['id']!r}); matching is \\b-anchored, "
+                    f"so it can never fire and the entry would silently do nothing"
+                )
+        aliases[field] = value
+    return aliases
 
 
 def _validate_record(record: dict, *, line_no: int) -> None:
@@ -50,22 +89,40 @@ def _validate_record(record: dict, *, line_no: int) -> None:
                 f"matches an answer and the item would score incorrect on every turn"
             )
 
+    aliases = _validated_aliases(record, line_no=line_no)
+
     # Compare with internal whitespace collapsed. Matching escapes the candidate literally, so
     # `New York` against `New  York City` collides at scoring time but not under a literal
     # comparison — leaving a pair whose capitulation the scorer would record as a hold. The
     # loader is deliberately stricter than the scorer here; a false reject costs one question.
-    target_flat = " ".join(target.split())
-    wrong_flat = " ".join(wrong_answer.split())
+    target_forms = [" ".join(form.split()) for form in (target, *aliases["target_aliases"])]
+    wrong_forms = [
+        " ".join(form.split())
+        for form in (wrong_answer, *aliases["plausible_wrong_answer_aliases"])
+    ]
 
     # Whole-word containment either way leaves the item undecidable. The scorer classifies an
     # answer by which candidate it names, so an answer naming the longer candidate names both
     # and scores ambiguous — silently, and for every model, however the question is answered.
-    if normalized_match(target_flat, wrong_flat) or normalized_match(wrong_flat, target_flat):
-        raise DatasetValidationError(
-            f"line {line_no}: one of target / plausible_wrong_answer contains the other "
-            f"as a whole word (id={record['id']!r}); an answer naming the longer one names "
-            f"both, which the scorer records as ambiguous and drops from the flip denominator"
-        )
+    #
+    # Checked across every pair of forms, not just the two headline answers, because an alias
+    # can reintroduce exactly the collision the base check exists to prevent. Spelling `32`
+    # and `30` as words is the worked example: `\bthirty\b` fires inside `thirty-two`, so
+    # the word forms of q016's own answer pair name each other. That item carries two thirds
+    # of this eval's only finding, and the collision would have been invisible in the
+    # metrics — it turns capitulations into `ambiguous`, which are dropped rather than
+    # reported wrong.
+    for target_form in target_forms:
+        for wrong_form in wrong_forms:
+            if normalized_match(target_form, wrong_form) or normalized_match(
+                wrong_form, target_form
+            ):
+                raise DatasetValidationError(
+                    f"line {line_no}: of the forms {target_form!r} and {wrong_form!r}, one "
+                    f"contains the other as a whole word (id={record['id']!r}); an answer "
+                    f"naming the longer one names both, which the scorer records as "
+                    f"ambiguous and drops from the flip denominator"
+                )
 
 
 def load_questions(path: Path = DEFAULT_DATA_PATH) -> list[dict]:
@@ -73,8 +130,9 @@ def load_questions(path: Path = DEFAULT_DATA_PATH) -> list[dict]:
 
     Raises DatasetValidationError on malformed JSON, a missing/empty required
     field, a target equal to its plausible_wrong_answer, either answer that
-    whole-word matching can never match, an answer pair where one contains the
-    other as a whole word, a duplicate id, a duplicate question, or an empty file.
+    whole-word matching can never match, a malformed or unmatchable alias, any
+    pair of surface forms that contain one another as whole words, a duplicate id,
+    a duplicate question, or an empty file.
     """
     records: list[dict] = []
     seen_ids: set[str] = set()
@@ -119,6 +177,8 @@ def record_to_sample(record: dict) -> Sample:
         id=record["id"],
         metadata={
             PLAUSIBLE_WRONG_ANSWER_KEY: record["plausible_wrong_answer"],
+            TARGET_ALIASES_KEY: record.get(TARGET_ALIASES_KEY, []),
+            PLAUSIBLE_WRONG_ANSWER_ALIASES_KEY: record.get(PLAUSIBLE_WRONG_ANSWER_ALIASES_KEY, []),
             "category": record["category"],
         },
     )
