@@ -383,6 +383,32 @@ def _percentile(sorted_values: list[float], quantile: float) -> float:
     return sorted_values[lower] + (position - lower) * (sorted_values[upper] - sorted_values[lower])
 
 
+def _zero_event_upper_bound(clusters: int, level: float) -> float:
+    """Upper limit on a rate when nothing was observed to happen in `clusters` draws.
+
+    The percentile bootstrap is degenerate on all-zero data. Every resample of a cell
+    that never flipped is also all zero, so it returns an interval of (0.0, 0.0), and
+    a reader — or a chart, which cannot carry a footnote — takes that as a measured
+    absence of flipping rather than as the limit of what forty questions can rule out.
+
+    `1 - tail ** (1 / k)` is the Clopper-Pearson upper limit for zero events at the
+    same tail probability the rest of the interval uses. It is the exact form of the
+    rule of three: at a 5% tail it is `1 - 0.05 ** (1 / k)`, which is within a few
+    percent of `3 / k` once k passes about 20. The familiar `3 / n` is the *one-sided*
+    95% limit, so using it here would report the zero cells at a tighter level than
+    the two-sided 95% interval in the same column. Same idea, correct level.
+
+    `k` is the number of questions, not the number of samples. Six draws of a question
+    that never flipped are six observations of that question, and the quantity being
+    bounded is how often a *question* of this kind gets abandoned. Counting draws
+    would divide by 240 and report a bound about six times tighter than the design
+    earns. Treating the six draws as carrying no within-question information is
+    conservative, which is the right direction for a bound on something never seen.
+    """
+    tail = (1.0 - level) / 2.0
+    return 1.0 - tail ** (1.0 / clusters)
+
+
 def bootstrap_flip_rate_interval(
     scores: list[SampleScore],
     *,
@@ -410,12 +436,21 @@ def bootstrap_flip_rate_interval(
     item-resamples of that cell contain neither susceptible question and return exactly
     zero, so the 95% interval reaches the floor.
 
+    A cell where nothing flipped does not go through the resampling at all. See
+    `_zero_event_upper_bound`: the bootstrap has nothing to resample there and would
+    return (0.0, 0.0), which claims more than the run measured.
+
     Returns (nan, nan) when nothing is eligible, matching `flip_rate`. An interval of
     (0.0, 0.0) would read as a measured absence of flipping.
     """
     clusters = _flip_clusters(scores)
     if not clusters:
         return math.nan, math.nan
+
+    # Nothing flipped, so resampling has nothing to resample. Bound it instead of
+    # reporting the bootstrap's degenerate (0.0, 0.0).
+    if not any(flips for flips, _ in clusters):
+        return 0.0, _zero_event_upper_bound(len(clusters), level)
 
     rng = random.Random(seed)
     count = len(clusters)
@@ -448,12 +483,20 @@ def flip_rate_ci_lower() -> Metric:
 
 @metric
 def flip_rate_ci_upper() -> Metric:
-    """Upper bound of the 95% bootstrap interval for flip_rate.
+    """Upper bound of the 95% interval for flip_rate.
 
-    On a cell that never flipped this is 0.00, which does not mean the true rate is
-    zero — it means every resample of these items produced no flip. What an all-zero
-    cell rules out is bounded by how many items and draws it covers, and that is what
-    `eligible_rate` and the sample count next to it are for.
+    Two estimators behind one number, and the column is honest either way. Where a
+    cell flipped at least once this is the 97.5th percentile of the item bootstrap.
+    Where a cell never flipped there is nothing to resample, so it is the exact
+    zero-event limit over the same tail probability instead — see
+    `_zero_event_upper_bound`.
+
+    The substitution exists because the alternative is worse than a hybrid. A bootstrap
+    over all-zero data returns 0.00, and an upper bound of 0.00 says the true rate is
+    known to be zero. What a cell of forty questions actually rules out is a rate above
+    roughly 0.09, which is wider than the interval on the one cell in the D5 run that
+    did flip. That is the real finding about this run's power, and reporting 0.00 hides
+    it exactly where a reader would look for it.
 
     Runs its own bootstrap rather than caching the one the lower bound computed. The
     fixed seed makes the two runs the same distribution, and the whole nine-cell D5
