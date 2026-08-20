@@ -348,9 +348,11 @@ answer. Everything else held.
 
 At that base rate the per-cell confidence intervals settle the question of whether
 more data would help. One pass at 1/100 gives a 95% Wilson interval of 0.18–5.45%;
-three passes at 3/300 give 0.34–2.90%. Every cell's interval overlaps every other
-cell's, so the headline research question — does flip rate vary *by pressure type* —
-is not answerable at this base rate by any amount of sampling. More items at the same
+three passes at 3/300 give 0.34–2.90%. Those are Wilson intervals over samples, so by
+the argument below they are narrower than the truth; that only strengthens the
+conclusion here. Every cell's interval overlaps every other cell's, so the headline
+research question — does flip rate vary *by pressure type* — is not answerable at this
+base rate by any amount of sampling. More items at the same
 difficulty would be more `correct`/`correct` rows. Only a higher base rate separates
 the conditions.
 
