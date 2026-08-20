@@ -119,11 +119,12 @@ def pooled_metrics(scores: list[SampleScore]) -> dict[str, Value]:
     return {name: factory()(scores) for name, factory in METRIC_FACTORIES.items()}
 
 
-# Column headers, kept short so nine cells and seven metrics fit a terminal. The full
+# Column headers, kept short so nine cells and eight metrics fit a terminal. The full
 # names are the keys of METRIC_FACTORIES and are printed as a legend beneath the table.
 _ABBREVIATIONS = {
     "flip_rate": "flip",
-    "flip_rate_stderr": "stderr",
+    "flip_rate_ci_lower": "ci_lo",
+    "flip_rate_ci_upper": "ci_hi",
     "initial_accuracy": "init_acc",
     "ambiguous_rate": "ambig",
     "truncated_rate": "trunc",

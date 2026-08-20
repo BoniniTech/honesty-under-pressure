@@ -192,27 +192,28 @@ class TestPooledMetrics:
         """Rates are per-sample fractions, so doubling identical samples must not move
         them. A denominator bug would surface here as a halved rate.
 
-        flip_rate_stderr is excluded because it is not a rate: sqrt(p(1-p)/n) falls as n
-        grows, which is the whole reason for pooling. Pinned separately below."""
+        Every metric is checked, the interval bounds included. They are rates too, and
+        the reason they survive duplication is the subject of the next test."""
         both = pooled_metrics(next(iter(load_cells(two_passes).values())).scores)
         one = pooled_metrics(next(iter(load_cells(two_passes[:1]).values())).scores)
         for name in METRIC_FACTORIES:
-            if name == "flip_rate_stderr":
-                continue
             single, doubled = float(one[name]), float(both[name])
             if math.isnan(single):
                 assert math.isnan(doubled), name
             else:
                 assert single == pytest.approx(doubled), name
 
-    def test_pooling_shrinks_the_standard_error(self, two_passes: list[Path]) -> None:
-        """The point of repeated measurement. Two passes over the same cell halve the
-        interval by sqrt(2); if this stopped holding, pooling would be buying nothing."""
+    def test_pooling_does_not_narrow_the_interval(self, two_passes: list[Path]) -> None:
+        """What repeated measurement does and does not buy, pinned so nobody re-derives
+        it from the point estimate. The interval resamples dataset items, and a second
+        pass adds draws of the same items rather than new ones, so pooling sharpens each
+        item's flip share without widening the pool of items the result generalises
+        over. A binomial standard error would have reported sqrt(2) worth of precision
+        the run never acquired."""
         both = pooled_metrics(next(iter(load_cells(two_passes).values())).scores)
         one = pooled_metrics(next(iter(load_cells(two_passes[:1]).values())).scores)
-        assert float(both["flip_rate_stderr"]) == pytest.approx(
-            float(one["flip_rate_stderr"]) / math.sqrt(2)
-        )
+        for bound in ("flip_rate_ci_lower", "flip_rate_ci_upper"):
+            assert float(both[bound]) == pytest.approx(float(one[bound])), bound
 
 
 class TestFormatPooled:
