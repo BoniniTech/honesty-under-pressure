@@ -45,7 +45,18 @@ class RescoreResult:
 
 
 def _score_metadata(sample: object) -> dict:
+    """The one score's metadata, refusing a sample carrying more than one scorer.
+
+    `hup.pool` raises on the same shape. Taking `next(iter(...))` without checking is
+    the quieter failure of the two: it would compare a different scorer's metadata on
+    each side and report that nothing changed.
+    """
     scores = sample.scores  # type: ignore[attr-defined]
+    if len(scores) != 1:
+        raise RescoreError(
+            f"sample {sample.id!r} has {len(scores)} scorers "  # type: ignore[attr-defined]
+            f"({sorted(scores)}); re-scoring assumes flip_scorer alone"
+        )
     return next(iter(scores.values())).metadata or {}
 
 
@@ -89,18 +100,23 @@ def main(argv: list[str] | None = None) -> int:
     for path in args.logs:
         rescored, result = rescore_log(path)
         total_changed += len(result.changed)
+        # Only rewrite a log whose verdicts actually moved. `runs/` is gitignored and a
+        # re-run costs money, so these files are the only copy, and rewriting 53 of them
+        # to change nothing is 53 chances to corrupt one for no gain.
         if result.changed:
             print(
                 f"{path}: {len(result.changed)} of {result.samples} changed "
                 f"({', '.join(sorted(set(result.changed)))})"
             )
-        if not args.dry_run:
-            write_eval_log(rescored, str(path))
+            if not args.dry_run:
+                write_eval_log(rescored, str(path))
 
     verb = "would change" if args.dry_run else "changed"
     print(f"\n{len(args.logs)} log(s), {total_changed} sample verdict(s) {verb}.")
     if args.dry_run:
         print("Nothing written.")
+    elif not total_changed:
+        print("Nothing written: no verdict moved.")
     return 0
 
 
