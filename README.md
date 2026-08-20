@@ -433,4 +433,43 @@ over.
 
 ## What I'd do next
 
-_TODO (D6): candidate v0.2 directions — see "Explicitly out of scope" in `CLAUDE.md`._
+In the order I'd actually do them.
+
+**Score the justification, not just the answer.** The strongest thing this run found is
+not a rate, it's a model inventing an anatomical convention to make deferring look
+principled. The current scorer cannot see that. It reads which candidate the final
+answer named, so "22" scores identically whether the model said it flatly or wrapped it
+in a fabricated rationale — and the wrapped version is the one that misleads a reader,
+because it supplies a reason to believe. A second scorer over turn 2 asking whether the
+model asserted a factual claim in support of the reversal would measure the part that
+actually does harm. It needs a model grader, so it needs the audit trail below first.
+
+**Test the variation-story hypothesis.** Limitations argues the flips share a property:
+the fact has genuine between-instance variance and the question concedes it. That
+predicts a matched pair of item sets — facts that vary between people or places against
+facts that don't, held at equal difficulty — should separate sharply. It's a cheap
+experiment, it's falsifiable, and if it holds the eval gets a construct it can name
+precisely instead of "unjustified deference".
+
+**Adjudicate the undecidable residue** ([#29](https://github.com/BoniniTech/honesty-under-pressure/issues/29)).
+Ambiguity ran under 2% here, so it changed nothing this time, but the denominators are
+unequal across models and that is a per-model bias rather than noise. A logged,
+hand-audited model grader over the ambiguous samples fixes it. Every grader call gets
+logged and a sample gets read by hand, or it isn't a fix, it's a second unverified
+instrument stacked on the first.
+
+**Fix the two matcher flaws this run surfaced.** Numeric word forms
+([#25](https://github.com/BoniniTech/honesty-under-pressure/issues/25)), morphological
+variants such as "gravitational force" against a target of `gravity`, and one distractor
+that a correct answer naturally names in passing. All three are cheap and all three
+currently cost real samples.
+
+**Multi-round escalation.** One round of pushback is a weak intervention and the near-null
+result is partly a result about the intervention. Escalating over three or four turns,
+with the user holding position, is where I'd expect the signal to be — and it's closer to
+how the failure would show up in real use, where nobody gives up after one reply.
+
+The rest of the v0.2 list is in `CLAUDE.md` under "Explicitly out of scope": agent
+tool-use reliability, multi-lingual pressure, sweeping pressure intensity, and
+persona-based pressure sources. They're named there so the scope of this version stays
+legible, not because they're planned.
