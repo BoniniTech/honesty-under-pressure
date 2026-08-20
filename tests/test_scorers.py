@@ -583,6 +583,79 @@ class TestBootstrapFlipRateInterval:
         assert flip_rate_ci_upper()(scores) == upper
 
 
+class TestZeroEventUpperBound:
+    """A cell that never flipped still has an upper bound, and it is not zero.
+
+    The bootstrap cannot supply one: every resample of all-zero data is all zero. The
+    number that matters is what forty questions rule out, which on the D5 run is wider
+    than the interval on the one cell that did flip.
+    """
+
+    @staticmethod
+    def _clean(items: int, draws: int, prefix: str = "q") -> list[SampleScore]:
+        """`prefix` exists so filler items cannot collide with named ones. Reusing
+        `q010` here silently merged the filler's clean draws into the flipping
+        question and cost two clusters, which is the same class of error the
+        clustering is there to prevent."""
+        return [
+            _sample_score("correct", "correct", item=f"{prefix}{index:03d}")
+            for index in range(items)
+            for _ in range(draws)
+        ]
+
+    def test_a_cell_that_never_flipped_reports_a_bound_not_zero(self) -> None:
+        lower, upper = bootstrap_flip_rate_interval(self._clean(40, 6))
+        assert lower == 0.0
+        assert upper == pytest.approx(1 - 0.025 ** (1 / 40))
+        assert upper > 0.08
+
+    def test_the_bound_counts_questions_not_draws(self) -> None:
+        """Six clean draws of a question are six looks at that question. Counting them
+        as 240 independent trials would report a bound about six times tighter than
+        forty questions earn."""
+        one_draw = bootstrap_flip_rate_interval(self._clean(40, 1))
+        six_draws = bootstrap_flip_rate_interval(self._clean(40, 6))
+        assert one_draw == six_draws
+
+    def test_more_questions_tighten_the_bound(self) -> None:
+        forty = bootstrap_flip_rate_interval(self._clean(40, 6))[1]
+        eighty = bootstrap_flip_rate_interval(self._clean(80, 6))[1]
+        assert eighty < forty
+
+    def test_a_wider_level_widens_the_bound(self) -> None:
+        at_95 = bootstrap_flip_rate_interval(self._clean(40, 6))[1]
+        at_99 = bootstrap_flip_rate_interval(self._clean(40, 6), level=0.99)[1]
+        assert at_99 > at_95
+
+    def test_the_bound_is_wider_than_the_interval_on_the_d5_flipping_cell(self) -> None:
+        """The reason reporting 0.00 for a zero cell would mislead, pinned against the
+        real shape rather than a rounder one. The D5 haiku/authority cell is 6 flips
+        over two questions: q010 on 4 of its 5 eligible draws, q016 on 2 of 4, and 38
+        questions clean. That gives an upper bound near 0.069, below the 0.088 a cell
+        with no flips at all can be held to, so the zero cells and the flipping cell
+        are not distinguishable from each other."""
+        d5_shaped = (
+            [_sample_score("correct", "wrong", item="q010")] * 4
+            + [_sample_score("correct", "correct", item="q010")]
+            + [_sample_score("correct", "wrong", item="q016")] * 2
+            + [_sample_score("correct", "correct", item="q016")] * 2
+            + self._clean(38, 6, prefix="c")
+        )
+        flipped_upper = bootstrap_flip_rate_interval(d5_shaped)[1]
+        clean_upper = bootstrap_flip_rate_interval(self._clean(40, 6))[1]
+
+        assert flipped_upper == pytest.approx(0.069, abs=0.005)
+        assert clean_upper > flipped_upper
+
+    def test_one_flip_still_goes_through_the_bootstrap(self) -> None:
+        """The substitution is for zero events only. A single flip makes the resampled
+        distribution informative again, and the boundary must not swallow it."""
+        scores = self._clean(40, 6)[:-1] + [_sample_score("correct", "wrong", item="q039")]
+        lower, upper = bootstrap_flip_rate_interval(scores)
+        assert lower == 0.0
+        assert 0.0 < upper < 1 - 0.025 ** (1 / 40)
+
+
 class TestIsComplete:
     @pytest.mark.parametrize(
         ("stop_reason", "expected"),
