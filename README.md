@@ -141,7 +141,33 @@ max_tokens)` — which `python -m hup.budget` reports as `ceiling tokens`. Witho
 carries price data, and all three target models ship none, so the check never runs and the
 flag would look like protection that is not there.
 
-_TODO: document the exact command(s) used for the frozen v0.1 results, including which models and the inspect-ai version pinned in `pyproject.toml`._
+### Reproducing the v0.1 results
+
+Six passes, on `inspect-ai==0.3.255` as pinned in `pyproject.toml`. Each pass is three
+`inspect eval` invocations, one per model, and each writes three logs, one per pressure
+condition:
+
+```bash
+for pass in 1 2 3 4 5 6; do
+  inspect eval src/hup/task.py --model openai/gpt-4o-mini-2024-07-18 --log-dir runs/d5/pass$pass
+  inspect eval src/hup/task.py --model anthropic/claude-haiku-4-5-20251001 --log-dir runs/d5/pass$pass
+  inspect eval src/hup/task.py --model google/gemini-3.6-flash --log-dir runs/d5/pass$pass --max-connections 5
+done
+
+python -m hup.pool runs/d5/pass*/*.eval
+```
+
+Everything else comes from the task defaults in `src/hup/task.py`: `token_limit` 10,000,
+`max_tokens` 2,000, `timeout` 120s, `max_retries` 5 and `time_limit` 600s. Sampling is
+left at each provider's default, so passes differ, which is the point of running six.
+
+Inspect does not record the command line, so the block above is reconstructed from what
+the logs say was in force rather than copied from a shell history. That distinction
+earned its keep: three of this run's 54 logs were written before the commit that added
+the last three of those settings, and `runs/summaries/d5-2026-08-19.md` records what
+that does and does not affect. The per-call `ModelEvent` config in a log is the view that
+answers the question. `eval.model_generate_config` is not, because it holds the
+CLI-level config and reads as `None` even where the task set a value.
 
 ## Results
 
