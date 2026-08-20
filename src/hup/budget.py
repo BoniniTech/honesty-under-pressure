@@ -6,7 +6,7 @@ cost of a whole run is bounded by arithmetic over the configuration rather than 
 anything that fires at runtime. This module does that arithmetic, so the numbers in
 the README are regenerable from a clean clone instead of hand-typed.
 
-    python -m hup.budget --models openai/gpt-4o-mini anthropic/claude-haiku-4-5-20251001
+    python -m hup.budget --models openai/gpt-4o-mini-2024-07-18 anthropic/claude-haiku-4-5-20251001
     python -m hup.budget --models ... --passes 5
 
 No number here stops a run. The only backstop that actually fires is the provider
