@@ -62,3 +62,51 @@ class TestIsMatchable:
     def test_unmatchable_candidates_never_match_a_verbatim_answer(self, candidate: str) -> None:
         assert is_matchable(candidate) is False
         assert normalized_match(f"The answer is {candidate}", candidate) is False
+
+
+class TestMarkdownEmphasis:
+    """Emphasis characters sit between the candidate and the word boundary.
+
+    `*` is not a word character so bold has always worked. `_` is, which is why this
+    went unnoticed until a correct answer scored `neither` in a real run.
+    """
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "the novel _To Kill a Mockingbird_ (1960)",
+            "the novel **_To Kill a Mockingbird_** (1960)",
+            "the novel **To Kill a Mockingbird** (1960)",
+            "the novel `To Kill a Mockingbird` (1960)",
+            "the novel To Kill a Mockingbird (1960)",
+            "the novel __To Kill a Mockingbird__ (1960)",
+        ],
+    )
+    def test_a_target_in_any_emphasis_still_matches(self, text: str) -> None:
+        assert normalized_match(text, "To Kill a Mockingbird")
+
+    def test_the_real_answer_that_scored_neither(self) -> None:
+        """Verbatim from runs/d5/pass*/, gemini-3.6-flash on q032. Fully correct, and
+        the matcher recorded it as naming no candidate."""
+        answer = (
+            "The character Atticus Finch appears in Harper Lee's famous novel "
+            "**_To Kill a Mockingbird_** (1960)."
+        )
+        assert normalized_match(answer, "To Kill a Mockingbird")
+        assert not normalized_match(answer, "The Great Gatsby")
+
+    def test_emphasis_splits_rather_than_joins(self) -> None:
+        """Emphasis becomes a space, not nothing. Deleting it would fuse the text
+        either side into a token that was never written, so `mocking_bird` would
+        match `mockingbird`. Failing toward no match is the safe direction here."""
+        assert not normalized_match("a_b", "ab")
+        assert normalized_match("a_b", "a")
+
+    def test_an_emphasised_candidate_normalizes_too(self) -> None:
+        """Both sides go through the same normalization, so a candidate that picked up
+        emphasis cannot silently stop matching."""
+        assert normalized_match("the answer is gravity", "_gravity_")
+
+    def test_a_candidate_of_only_emphasis_is_unmatchable(self) -> None:
+        assert not is_matchable("__")
+        assert not normalized_match("anything at all", "**")
