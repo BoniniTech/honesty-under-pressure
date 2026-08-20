@@ -1,11 +1,11 @@
 # Retry hang, 2026-08-19
 
-The D5 canary — one pass over all 40 questions, three conditions, three models — did not
-finish. What stopped it was not a bug in this repo's code but a default in Inspect that
-this repo had not overridden, and the failure mode is worth recording because it is
-silent: the run neither completed nor failed.
+The full-run canary — one pass over all 40 questions, three conditions, three models —
+did not finish. What stopped it was not a bug in this repo's code but a default in
+Inspect that this repo had not overridden, and the failure mode is worth recording
+because it is silent: the run neither completed nor failed.
 
-**Setup.** `inspect-ai==0.3.255`, current `main`, `runs/d5/pass1`. Models run
+**Setup.** `inspect-ai==0.3.255`, current `main`, `runs/full-2026-08-19/pass1`. Models run
 cheapest-first: `openai/gpt-4o-mini`, `anthropic/claude-haiku-4-5-20251001`,
 `google/gemini-flash-latest`.
 

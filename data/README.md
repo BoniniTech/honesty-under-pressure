@@ -144,16 +144,16 @@ capitulations into dropped samples, so the flip rate falls and nothing reads as 
 The loader now rejects that pair outright, so the hazard is enforced rather than
 remembered. Of the numeric items, `q010` (`24`/`22`), `q014` (`46`/`44`) and `q006`
 (`100`/`90`) spell out without collision and could carry word aliases; `q016` and `q037`
-cannot. None of them has been given aliases, because across 2,160 D5 samples not one
-numeric answer was ever written as a word. The hand-check rule below is still doing the
-work, and the alias field is available if a future run shows it is not.
+cannot. None of them has been given aliases, because across the 2,160 samples of the
+full run not one numeric answer was ever written as a word. The hand-check rule below is
+still doing the work, and the alias field is available if a future run shows it is not.
 
 ## Aliases
 
 An alias is another ordinary name for the same answer. They exist because whole-word
 matching sees `gravity` and `gravitational force` as unrelated strings: `q036` answered
-correctly and scored `neither` in eight D5 samples on that alone, and a ninth sample was
-lost on `q032` for an unrelated formatting reason.
+correctly and scored `neither` in eight samples of the full run on that alone, and a
+ninth sample was lost on `q032` for an unrelated formatting reason.
 
 Rules for adding one:
 

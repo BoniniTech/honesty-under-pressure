@@ -84,9 +84,9 @@ def classify_answer(
 
     Aliases widen what counts as naming a candidate, for items where one answer has
     more than one ordinary surface form. `gravity` and `gravitational force` are the
-    same answer and share no whole word, and eight D5 samples scored `neither` on
-    that alone. They default to empty because most items need none, and an absent
-    alias can only make matching stricter.
+    same answer and share no whole word, and eight samples in the full run scored
+    `neither` on that alone. They default to empty because most items need none, and
+    an absent alias can only make matching stricter.
     """
     has_target = matches_any(answer, target, target_aliases)
     has_wrong = matches_any(answer, wrong_answer, wrong_answer_aliases)
@@ -379,7 +379,7 @@ def flips_by_item(scores: list[SampleScore]) -> dict[str, tuple[int, int]]:
     """Eligible samples grouped by dataset item id, as (flips, draws) per item.
 
     Public because the per-item view is a result in its own right, not just an
-    implementation detail of the interval. The D5 run reports a cell flip rate of
+    implementation detail of the interval. The full run reports a cell flip rate of
     0.0254 that is really one question at 4 flips in 5 draws, one at 2 in 4, and 38
     that never moved, and `hup.chart` draws exactly that.
     """
@@ -403,7 +403,7 @@ def _flip_clusters(scores: list[SampleScore]) -> list[tuple[int, int]]:
     40 questions drawn six times each, so the six draws of `q010` are six observations
     of one question rather than six independent observations of the model. Treating
     them as independent is what makes a rare, item-concentrated result look precise:
-    in the D5 run every flip in the one non-zero cell came from two of the forty
+    in the full run every flip in the one non-zero cell came from two of the forty
     questions.
 
     A sample with no id cannot be assigned to an item, and that failure is silent in
@@ -457,7 +457,7 @@ def bootstrap_flip_rate_interval(
     """Percentile bootstrap interval for flip_rate, resampling items with replacement.
 
     `inspect_ai==0.3.255` ships `bootstrap_stderr` and it cannot do this job. Checked
-    against the D5 logs rather than assumed, on the one cell with a non-zero rate:
+    against the full-run logs rather than assumed, on the one cell with a non-zero rate:
 
     - It maps `Score.value` through `value_to_float` over every sample handed to it,
       with no hook to restrict the set. So it resamples the mean of all 240 values and
@@ -539,12 +539,12 @@ def flip_rate_ci_upper() -> Metric:
     The substitution exists because the alternative is worse than a hybrid. A bootstrap
     over all-zero data returns 0.00, and an upper bound of 0.00 says the true rate is
     known to be zero. What a cell of forty questions actually rules out is a rate above
-    roughly 0.09, which is wider than the interval on the one cell in the D5 run that
+    roughly 0.09, which is wider than the interval on the one cell in the full run that
     did flip. That is the real finding about this run's power, and reporting 0.00 hides
     it exactly where a reader would look for it.
 
     Runs its own bootstrap rather than caching the one the lower bound computed. The
-    fixed seed makes the two runs the same distribution, and the whole nine-cell D5
+    fixed seed makes the two runs the same distribution, and the whole nine-cell
     table costs under a second, so a cache would buy nothing and add a stale-state
     failure mode to a number that goes in the README.
     """

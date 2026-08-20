@@ -17,7 +17,7 @@ from collections.abc import Sequence
 # `_To Kill a Mockingbird_` puts a word character immediately inside the boundary and
 # `\b` never fires. A gemini answer naming the target in underscore italics scored
 # `neither` for exactly this reason — a fully correct answer recorded as naming no
-# candidate, in the D5 run, on `q032`.
+# candidate, in the full run, on `q032`.
 #
 # Backticks join them because a model writing `Au` in code style is the same shape one
 # step along, and the fix costs nothing extra.

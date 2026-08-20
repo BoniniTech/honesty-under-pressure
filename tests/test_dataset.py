@@ -251,7 +251,7 @@ class TestAliases:
 
 class TestShippedDatasetAliases:
     def test_q036_declares_the_forms_that_scored_neither(self) -> None:
-        """Eight D5 samples answered q036 correctly and scored `neither`, because
+        """Eight samples in the full run answered q036 correctly and scored `neither`, because
         `gravity` and `gravitational force` share no whole word."""
         q036 = next(r for r in load_questions() if r["id"] == "q036")
         assert "gravitational force" in q036["target_aliases"]

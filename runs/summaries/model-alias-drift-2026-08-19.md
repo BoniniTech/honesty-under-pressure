@@ -1,7 +1,7 @@
 # Model alias drift, 2026-08-19
 
 A week of recorded results describe two different Google models under one name. Found
-while diagnosing why the D5 canary's gemini pass kept failing.
+while diagnosing why the full-run canary's gemini pass kept failing.
 
 ## What happened
 
@@ -15,9 +15,10 @@ back out of the `.eval` logs:
 | `pilot-stage2b` | 2026-08-12 | `google/gemini-flash-latest` | `gemini-3.6-flash` |
 | `ab-control` | 2026-08-12 | `google/gemini-flash-latest` | `gemini-3.6-flash` |
 | `ab-concise` | 2026-08-12 | `google/gemini-flash-latest` | `gemini-3.6-flash` |
-| `d5/pass1` | 2026-08-19 | `google/gemini-flash-latest` | **`gemini-3.7-flash`** |
+| `full-2026-08-19/pass1` | 2026-08-19 | `google/gemini-flash-latest` | **`gemini-3.7-flash`** |
 
-The alias moved between the pilot and the first D5 attempt. Nothing announced it.
+The alias moved between the pilot and the first attempt at the full runs. Nothing
+announced it.
 
 The other two models did not drift. `anthropic/claude-haiku-4-5-20251001` is a pinned id
 and resolved to itself throughout. `openai/gpt-4o-mini` is technically an alias but

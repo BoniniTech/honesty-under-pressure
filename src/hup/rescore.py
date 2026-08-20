@@ -1,7 +1,7 @@
 """Re-score existing eval logs with the current scorer, without paying for a run.
 
-    python -m hup.rescore --dry-run runs/d5/pass*/*.eval    # report, write nothing
-    python -m hup.rescore runs/d5/pass*/*.eval              # rewrite in place
+    python -m hup.rescore --dry-run runs/full-2026-08-19/pass*/*.eval    # report, write nothing
+    python -m hup.rescore runs/full-2026-08-19/pass*/*.eval              # rewrite in place
 
 Makes no provider calls: `flip_scorer` is containment over text already in the log.
 Inspect still constructs a client for the model named in the log, so a key has to be

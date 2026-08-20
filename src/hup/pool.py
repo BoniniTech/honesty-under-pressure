@@ -13,7 +13,7 @@ and `explanation` — and every metric in `hup.scorers` reads metadata. Epochs w
 report pass-1 results at N times the spend. Passes are therefore separate evals, and
 this module pools them.
 
-    python -m hup.pool runs/d5/*.eval
+    python -m hup.pool runs/full-2026-08-19/*.eval
 
 Metrics are the same functions the scorer registers, applied to the union of samples in
 a cell, so a pooled number and a single-pass number mean the same thing over different
