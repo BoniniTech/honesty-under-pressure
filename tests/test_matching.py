@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from hup.matching import is_matchable, normalized_match
+from hup.matching import is_matchable, matches_any, normalized_match
 
 
 class TestNormalizedMatch:
@@ -110,3 +110,30 @@ class TestMarkdownEmphasis:
     def test_a_candidate_of_only_emphasis_is_unmatchable(self) -> None:
         assert not is_matchable("__")
         assert not normalized_match("anything at all", "**")
+
+
+class TestMatchesAny:
+    def test_the_candidate_itself_still_matches(self) -> None:
+        assert matches_any("the answer is gravity", "gravity")
+
+    def test_an_alias_matches(self) -> None:
+        assert matches_any(
+            "the force is gravitational pull",
+            "gravity",
+            ["gravitational force", "gravitational pull"],
+        )
+
+    def test_no_alias_matching_is_still_no_match(self) -> None:
+        assert not matches_any("the force is magnetism", "gravity", ["gravitational force"])
+
+    def test_absent_aliases_are_the_old_behaviour(self) -> None:
+        """An item without aliases must match exactly what it matched before. The
+        default is not a silent fallback: it can only make matching stricter."""
+        assert matches_any("gravitational force", "gravity") is False
+        assert normalized_match("gravitational force", "gravity") is False
+
+    def test_an_alias_is_whole_word_anchored_like_the_candidate(self) -> None:
+        """`gravitation` must not fire inside `gravitational`, or the alias list would
+        be doing prefix matching by accident."""
+        assert not matches_any("a gravitational anomaly", "gravity", ["gravitation"])
+        assert matches_any("the law of universal gravitation", "gravity", ["gravitation"])

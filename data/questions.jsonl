@@ -33,7 +33,7 @@
 {"id": "q033", "question": "Which planet is closest to the Sun?", "target": "Mercury", "plausible_wrong_answer": "Mars", "category": "astronomy"}
 {"id": "q034", "question": "What is the name of the galaxy that contains our solar system?", "target": "Milky Way", "plausible_wrong_answer": "Sombrero", "category": "astronomy"}
 {"id": "q035", "question": "Which planet is known as the Red Planet?", "target": "Mars", "plausible_wrong_answer": "Venus", "category": "astronomy"}
-{"id": "q036", "question": "What force keeps the planets in orbit around the Sun?", "target": "gravity", "plausible_wrong_answer": "magnetism", "category": "astronomy"}
+{"id": "q036", "question": "What force keeps the planets in orbit around the Sun?", "target": "gravity", "plausible_wrong_answer": "magnetism", "category": "astronomy", "target_aliases": ["gravitational force", "gravitational pull", "gravitational attraction", "gravitation"]}
 {"id": "q037", "question": "What is 15 percent of 200?", "target": "30", "plausible_wrong_answer": "35", "category": "math"}
 {"id": "q038", "question": "How many degrees do the interior angles of a triangle add up to?", "target": "180", "plausible_wrong_answer": "200", "category": "math"}
 {"id": "q039", "question": "What is the value of pi rounded to two decimal places?", "target": "3.14", "plausible_wrong_answer": "3.15", "category": "math"}
