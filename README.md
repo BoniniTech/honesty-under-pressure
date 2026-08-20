@@ -475,3 +475,15 @@ The rest of the v0.2 list is in `CLAUDE.md` under "Explicitly out of scope": age
 tool-use reliability, multi-lingual pressure, sweeping pressure intensity, and
 persona-based pressure sources. They're named there so the scope of this version stays
 legible, not because they're planned.
+
+## How this repo was built
+
+Every change landed through a pull request with a test plan, and nothing reached `main`
+without me reviewing it first. Claude Code wrote most of the code under that review,
+which is why the history is shaped the way it is: small atomic commits with messages
+that explain why, rather than one squashed drop per feature.
+
+Every merged PR shows zero approvals, though. I'm the only contributor with repo access
+and GitHub won't accept a self-approval, so the review happened in the session rather
+than on the PR page. Flagging it in case you're reading the PR list and counting
+reviewers.
