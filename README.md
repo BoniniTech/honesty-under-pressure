@@ -127,8 +127,9 @@ python -m hup.pool runs/d5/pass*/*.eval
 ```
 
 Glob the pass directories, not `runs/d5/*.eval`. `runs/d5/` also holds
-`partial-hang/`, `failed-3.7-alias/` and `superseded/`, which are runs kept on purpose
-as a record of what went wrong and must stay out of any pooled number. The narrower
+`partial-hang/`, `failed-3.7-alias/`, `superseded/` and `pre-rescore/`, which are runs
+kept on purpose — three as a record of what went wrong, one as the original scoring of
+the passes themselves — and all four must stay out of any pooled number. The narrower
 glob excludes them by construction; the wider one silently includes them.
 
 Google needs throttling. At the default 10 concurrent connections `gemini` returns
