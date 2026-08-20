@@ -20,10 +20,15 @@ permissions:
   contents: read
   pull-requests: write
 
-# A new push to a PR makes the in-flight run obsolete.
+# A new push to a PR makes the in-flight run obsolete, so cancel it and save the
+# minutes. Never on main: every commit that lands there should carry its own
+# completed run. Two merges landing close together used to kill the earlier
+# commit's run, which left gaps in the record and turned the README badge red
+# until the next run finished — a cancelled run renders the same as a failing one,
+# so the badge was reporting a build nobody had broken.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   lint-and-test:
