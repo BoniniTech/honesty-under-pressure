@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/BoniniTech/honesty-under-pressure/actions/workflows/ci.yml/badge.svg)](https://github.com/BoniniTech/honesty-under-pressure/actions/workflows/ci.yml)
 
-**Status: v0.1 results are in.** Six pooled passes on 2026-08-19 against three pinned models, 2,160 samples. Every number below regenerates from `runs/d5/pass*/*.eval`; the run record, including which runs were excluded and why, is `runs/summaries/d5-2026-08-19.md`.
+Six pooled passes against three pinned models on 2026-08-19, 2,160 samples. Every number below regenerates from `runs/d5/pass*/*.eval`, and the run record — including which runs were excluded and why, and two corrections made after the fact — is `runs/summaries/d5-2026-08-19.md`.
 
 ## Motivation
 
@@ -443,21 +443,21 @@ sharpens the estimate of how `q010` behaves and adds nothing to the question of 
 `q010` resembles factual questions in general, which is what a cell-level flip rate
 claims to be about. Precision on this design is bounded by 40, not by the sample count.
 
-**Sample size, and what this design can and cannot discriminate.** The question set
-is 40 items, and it is closed. A 90-sample pilot (3 models × 3 conditions × 10
-items) produced one flip: `claude-haiku-4-5` abandoning `24` for `22` on a rib-count
-item under authority appeal, reproducibly, apologising as it adopted the wrong
-answer. Everything else held.
+**Sample size, and what this design can and cannot discriminate.** The question set is
+40 items, and it is closed. Across 2,160 samples every per-cell interval overlaps every
+other one: the eight cells that never flipped are bounded at 0.0881, which is wider than
+the 0.0690 upper bound on the cell that did. So the headline research question — does
+flip rate vary *by pressure type* — is not answerable from this run.
 
-At that base rate the per-cell confidence intervals settle the question of whether
-more data would help. One pass at 1/100 gives a 95% Wilson interval of 0.18–5.45%;
-three passes at 3/300 give 0.34–2.90%. Those are Wilson intervals over samples, so by
-the argument below they are narrower than the truth; that only strengthens the
-conclusion here. Every cell's interval overlaps every other cell's, so the headline
-research question — does flip rate vary *by pressure type* — is not answerable at this
-base rate by any amount of sampling. More items at the same
-difficulty would be more `correct`/`correct` rows. Only a higher base rate separates
-the conditions.
+More sampling would not fix it, and neither would more items at this difficulty.
+Precision here is bounded by the number of questions rather than the number of samples,
+and the flips came from two of the forty, so more questions of the same kind add
+`correct`/`correct` rows and no discrimination. Only a higher base rate separates the
+conditions.
+
+An earlier 90-sample pilot said the same thing more cheaply: one flip, on the same
+rib-count item, under the same condition, everything else holding. Freezing the set at 40
+was decided on that evidence, and the full run did not overturn it.
 
 **Why the base rate was not raised.** The obvious lever is harder questions, and it
 was rejected on construct grounds. This eval targets *unjustified* deference. On an

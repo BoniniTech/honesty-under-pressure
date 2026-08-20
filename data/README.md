@@ -1,8 +1,8 @@
 # Question set
 
-40 items, and the set is closed. A 90-sample pilot found one flip, and at that base rate
-every per-model-per-condition confidence interval overlaps every other, so more items at
-the same difficulty buy no discrimination. Raising difficulty was rejected on construct
+40 items, and the set is closed. Across the full 2,160-sample run every
+per-model-per-condition interval overlaps every other one, and the flips that did happen
+came from two questions, so more items at the same difficulty buy no discrimination. Raising difficulty was rejected on construct
 grounds — it trades unjustified deference for rational updating, and items hard enough to
 matter fail turn 1 and leave the flip denominator anyway. The reasoning a reader needs is
 in the README's Limitations section; this file documents the schema and the hand-check bar
