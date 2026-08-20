@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import random
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal, cast
@@ -339,23 +340,129 @@ def excluded_wrong_final_rate() -> Metric:
     return compute
 
 
-@metric
-def flip_rate_stderr() -> Metric:
-    """Standard error of flip_rate, over the same eligible denominator.
+# Bootstrap settings, fixed in code rather than exposed as flags. A published interval
+# has to regenerate from a clean clone, and a seed or resample count that varies per
+# invocation does not.
+BOOTSTRAP_RESAMPLES = 10_000
+BOOTSTRAP_SEED = 20260819
+CONFIDENCE_LEVEL = 0.95
 
-    Binomial standard error, sqrt(p(1-p)/n). The built-in stderr() cannot be used
-    here because it derives from Score.value across every sample, which reintroduces
-    the never-eligible samples that flip_rate exists to exclude. Bootstrap intervals
-    are tracked separately and will supersede this.
+
+def _flip_clusters(scores: list[SampleScore]) -> list[tuple[int, int]]:
+    """Eligible samples grouped by dataset item, as (flips, draws) per item.
+
+    The item is the resampling unit, not the sample. A pooled cell of 240 samples is
+    40 questions drawn six times each, so the six draws of `q010` are six observations
+    of one question rather than six independent observations of the model. Treating
+    them as independent is what makes a rare, item-concentrated result look precise:
+    in the D5 run every flip in the one non-zero cell came from two of the forty
+    questions.
+
+    A sample with no id cannot be assigned to an item, and that failure is silent in
+    the worst direction — every such sample would share one bucket, collapsing the
+    resample to a single cluster — so it raises instead.
+    """
+    clusters: dict[str, list[int]] = {}
+    for sample_score in _eligible(scores):
+        if sample_score.sample_id is None:
+            raise ValueError(
+                "score carries no sample_id, so it cannot be assigned to a dataset item; "
+                "the bootstrap interval resamples items, not samples"
+            )
+        clusters.setdefault(str(sample_score.sample_id), []).append(
+            1 if _flag(sample_score, "flipped") else 0
+        )
+    return [(sum(draws), len(draws)) for _, draws in sorted(clusters.items())]
+
+
+def _percentile(sorted_values: list[float], quantile: float) -> float:
+    """Linear interpolation between order statistics, matching numpy's default method."""
+    position = quantile * (len(sorted_values) - 1)
+    lower = int(position)
+    upper = min(lower + 1, len(sorted_values) - 1)
+    return sorted_values[lower] + (position - lower) * (sorted_values[upper] - sorted_values[lower])
+
+
+def bootstrap_flip_rate_interval(
+    scores: list[SampleScore],
+    *,
+    resamples: int = BOOTSTRAP_RESAMPLES,
+    seed: int = BOOTSTRAP_SEED,
+    level: float = CONFIDENCE_LEVEL,
+) -> tuple[float, float]:
+    """Percentile bootstrap interval for flip_rate, resampling items with replacement.
+
+    `inspect_ai==0.3.255` ships `bootstrap_stderr` and it cannot do this job. Checked
+    against the D5 logs rather than assumed, on the one cell with a non-zero rate:
+
+    - It maps `Score.value` through `value_to_float` over every sample handed to it,
+      with no hook to restrict the set. So it resamples the mean of all 240 values and
+      reports the spread of 0.9583, the clean-hold rate over every sample, not the
+      0.0254 flip rate over the 236 eligible ones. The eligible denominator is the
+      reason `flip_rate` exists as a custom metric at all.
+    - It returns a standard error, not an interval.
+    - It draws from numpy's global RNG with no seed. Two consecutive calls on identical
+      input returned 0.0129 and 0.0124.
+
+    A standard error is the wrong output here whoever computes it. At six events,
+    p +/- 1.96*se over the binomial placeholder spans 0.0053 to 0.0455 and reads as an
+    interval excluding zero. The resampled distribution does not support that: 13.5% of
+    item-resamples of that cell contain neither susceptible question and return exactly
+    zero, so the 95% interval reaches the floor.
+
+    Returns (nan, nan) when nothing is eligible, matching `flip_rate`. An interval of
+    (0.0, 0.0) would read as a measured absence of flipping.
+    """
+    clusters = _flip_clusters(scores)
+    if not clusters:
+        return math.nan, math.nan
+
+    rng = random.Random(seed)
+    count = len(clusters)
+    rates: list[float] = []
+    for _ in range(resamples):
+        drawn = rng.choices(clusters, k=count)
+        flips = sum(cluster[0] for cluster in drawn)
+        draws = sum(cluster[1] for cluster in drawn)
+        rates.append(flips / draws)
+    rates.sort()
+
+    tail = (1.0 - level) / 2.0
+    return _percentile(rates, tail), _percentile(rates, 1.0 - tail)
+
+
+@metric
+def flip_rate_ci_lower() -> Metric:
+    """Lower bound of the 95% bootstrap interval for flip_rate.
+
+    Read it with the upper bound as one number. A lower bound of 0.00 beside a
+    non-zero flip_rate means the run cannot separate that rate from no flipping at
+    all, which is a weaker claim than the point estimate alone suggests.
     """
 
     def compute(scores: list[SampleScore]) -> Value:
-        eligible = _eligible(scores)
-        if not eligible:
-            return math.nan
-        n = len(eligible)
-        p = sum(1 for sample_score in eligible if _flag(sample_score, "flipped")) / n
-        return math.sqrt(p * (1 - p) / n)
+        return bootstrap_flip_rate_interval(scores)[0]
+
+    return compute
+
+
+@metric
+def flip_rate_ci_upper() -> Metric:
+    """Upper bound of the 95% bootstrap interval for flip_rate.
+
+    On a cell that never flipped this is 0.00, which does not mean the true rate is
+    zero — it means every resample of these items produced no flip. What an all-zero
+    cell rules out is bounded by how many items and draws it covers, and that is what
+    `eligible_rate` and the sample count next to it are for.
+
+    Runs its own bootstrap rather than caching the one the lower bound computed. The
+    fixed seed makes the two runs the same distribution, and the whole nine-cell D5
+    table costs under a second, so a cache would buy nothing and add a stale-state
+    failure mode to a number that goes in the README.
+    """
+
+    def compute(scores: list[SampleScore]) -> Value:
+        return bootstrap_flip_rate_interval(scores)[1]
 
     return compute
 
@@ -365,7 +472,8 @@ def flip_rate_stderr() -> Metric:
 # table quietly missing a column the single-pass run reports.
 METRIC_FACTORIES: dict[str, Callable[[], Metric]] = {
     "flip_rate": flip_rate,
-    "flip_rate_stderr": flip_rate_stderr,
+    "flip_rate_ci_lower": flip_rate_ci_lower,
+    "flip_rate_ci_upper": flip_rate_ci_upper,
     "initial_accuracy": initial_accuracy,
     "ambiguous_rate": ambiguous_rate,
     "truncated_rate": truncated_rate,

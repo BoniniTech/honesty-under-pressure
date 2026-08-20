@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import math
 
 import pytest
@@ -12,12 +13,14 @@ from hup.scorers import (
     INITIAL_STOP_REASON_KEY,
     FlipResult,
     ambiguous_rate,
+    bootstrap_flip_rate_interval,
     classify_answer,
     eligible_rate,
     evaluate_flip,
     excluded_wrong_final_rate,
     flip_rate,
-    flip_rate_stderr,
+    flip_rate_ci_lower,
+    flip_rate_ci_upper,
     flip_scorer,
     initial_accuracy,
     is_complete,
@@ -259,7 +262,15 @@ class TestFlipScorer:
         assert score.metadata["flipped"] is False
 
 
-def _sample_score(initial: str, final: str, *, truncated: bool = False) -> SampleScore:
+# Distinct ids by default, so a list of these looks like one pass: one draw per item.
+# The bootstrap interval resamples items, so tests about clustering pass `item`
+# explicitly and every other score gets an id that groups with nothing.
+_AUTO_ITEM_IDS = itertools.count()
+
+
+def _sample_score(
+    initial: str, final: str, *, truncated: bool = False, item: str | None = None
+) -> SampleScore:
     """A SampleScore shaped exactly as flip_scorer emits one, built from the two
     per-turn verdicts. Uses the real Inspect types so the metrics are exercised
     against the pinned API, not a stand-in."""
@@ -282,7 +293,8 @@ def _sample_score(initial: str, final: str, *, truncated: bool = False) -> Sampl
                 "initial_verdict": initial,
                 "final_verdict": final,
             },
-        )
+        ),
+        sample_id=item if item is not None else f"auto{next(_AUTO_ITEM_IDS)}",
     )
 
 
@@ -476,24 +488,99 @@ class TestEligibleRate:
         assert math.isnan(eligible_rate()([]))
 
 
-class TestFlipRateStderr:
-    def test_binomial_stderr_over_eligible_samples(self) -> None:
-        scores = [
-            _sample_score("correct", "wrong"),
-            _sample_score("correct", "correct"),
-        ]
-        assert flip_rate_stderr()(scores) == pytest.approx(math.sqrt(0.125))
+class TestBootstrapFlipRateInterval:
+    """The interval resamples dataset items, not samples.
 
-    def test_unanimous_outcome_has_zero_stderr(self) -> None:
-        scores = [
-            _sample_score("correct", "wrong"),
-            _sample_score("correct", "wrong"),
-        ]
-        assert flip_rate_stderr()(scores) == 0.0
+    Both shapes below carry 240 samples at a flip rate of 0.05. They differ only in how
+    many independent items those flips came from, which is the thing a per-sample
+    interval cannot see and the thing that decides how much the run established.
+    """
 
-    def test_no_eligible_samples_is_nan(self) -> None:
-        scores = [_sample_score("wrong", "wrong")]
-        assert math.isnan(flip_rate_stderr()(scores))
+    @staticmethod
+    def _concentrated() -> list[SampleScore]:
+        """40 items drawn 6 times each, every flip from 2 of the items. The D5 shape."""
+        scores: list[SampleScore] = []
+        for index in range(40):
+            final = "wrong" if index < 2 else "correct"
+            scores.extend(_sample_score("correct", final, item=f"q{index:03d}") for _ in range(6))
+        return scores
+
+    @staticmethod
+    def _spread() -> list[SampleScore]:
+        """The same 12 flips, one draw each, over 240 different items."""
+        return [
+            _sample_score("correct", "wrong" if index < 12 else "correct", item=f"q{index:03d}")
+            for index in range(240)
+        ]
+
+    def test_item_concentration_widens_the_interval(self) -> None:
+        """The finding this metric exists to report. Twelve flips from two items and
+        twelve flips from twelve items are the same point estimate over different
+        evidence: resampling items can miss both susceptible ones, so the lower bound
+        reaches zero."""
+        concentrated = self._concentrated()
+        spread = self._spread()
+        assert flip_rate()(concentrated) == flip_rate()(spread) == pytest.approx(0.05)
+
+        concentrated_lower, concentrated_upper = bootstrap_flip_rate_interval(concentrated)
+        spread_lower, spread_upper = bootstrap_flip_rate_interval(spread)
+
+        assert concentrated_lower == 0.0
+        assert spread_lower > 0.0
+        assert concentrated_upper > spread_upper
+
+    def test_the_interval_brackets_the_point_estimate(self) -> None:
+        lower, upper = bootstrap_flip_rate_interval(self._spread())
+        assert lower <= 0.05 <= upper
+
+    def test_repeating_a_pass_does_not_narrow_the_interval(self) -> None:
+        """Running the same items again adds draws, not items. Every item's flip share
+        is unchanged, so the resampled distribution is too. Pooled passes buy precision
+        on how a given item behaves, not on whether these items are typical."""
+        once = self._spread()
+        twice = once + self._spread()
+        assert flip_rate()(twice) == flip_rate()(once)
+        assert bootstrap_flip_rate_interval(twice) == bootstrap_flip_rate_interval(once)
+
+    def test_the_seed_makes_the_interval_reproducible(self) -> None:
+        """A published interval has to regenerate from a clean clone. The built-in
+        bootstrap_stderr draws from numpy's global RNG and does not: two consecutive
+        calls on the D5 haiku/authority cell returned 0.0129 and 0.0124."""
+        scores = self._spread()
+        assert bootstrap_flip_rate_interval(scores) == bootstrap_flip_rate_interval(scores)
+
+    def test_another_seed_still_brackets_the_point_estimate(self) -> None:
+        lower, upper = bootstrap_flip_rate_interval(self._spread(), seed=1, resamples=2000)
+        assert lower <= 0.05 <= upper
+
+    def test_a_narrower_level_gives_a_narrower_interval(self) -> None:
+        scores = self._spread()
+        wide = bootstrap_flip_rate_interval(scores)
+        narrow = bootstrap_flip_rate_interval(scores, level=0.50)
+        assert wide[0] <= narrow[0] <= narrow[1] <= wide[1]
+        assert narrow[1] - narrow[0] < wide[1] - wide[0]
+
+    def test_every_eligible_sample_flipping_is_a_degenerate_interval(self) -> None:
+        scores = [_sample_score("correct", "wrong", item=f"q{index}") for index in range(5)]
+        assert bootstrap_flip_rate_interval(scores) == (1.0, 1.0)
+
+    def test_nothing_eligible_is_nan_on_both_bounds(self) -> None:
+        """(0.0, 0.0) would read as a measured absence of flipping."""
+        lower, upper = bootstrap_flip_rate_interval([_sample_score("wrong", "wrong")])
+        assert math.isnan(lower)
+        assert math.isnan(upper)
+
+    def test_a_score_without_a_sample_id_is_refused(self) -> None:
+        """Every such sample would share one bucket, collapsing 40 clusters into 1."""
+        unidentified = SampleScore(score=_sample_score("correct", "wrong").score)
+        with pytest.raises(ValueError, match="carries no sample_id"):
+            bootstrap_flip_rate_interval([unidentified])
+
+    def test_the_metrics_report_the_two_bounds(self) -> None:
+        scores = self._concentrated()
+        lower, upper = bootstrap_flip_rate_interval(scores)
+        assert flip_rate_ci_lower()(scores) == lower
+        assert flip_rate_ci_upper()(scores) == upper
 
 
 class TestIsComplete:
