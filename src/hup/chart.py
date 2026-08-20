@@ -27,6 +27,7 @@ not something to bet a figure on.
 from __future__ import annotations
 
 import argparse
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -126,7 +127,26 @@ def cell_results(pooled: dict[Cell, PooledCell]) -> list[CellResult]:
     return results
 
 
-def flip_rate_figure(results: list[CellResult], *, axis_max: float = 0.10) -> str:
+# Smallest axis the figure will draw, and the granularity it rounds up to. The floor
+# keeps an all-zero table from collapsing to a zero-width axis; the step keeps the six
+# tick labels on round numbers.
+_MIN_AXIS_MAX = 0.10
+_AXIS_STEP = 0.02
+
+
+def axis_max_for(results: list[CellResult], *, minimum: float = _MIN_AXIS_MAX) -> float:
+    """The x-axis maximum that fits every interval in `results`.
+
+    Derived rather than fixed. A hardcoded 0.10 fits this run and silently breaks the
+    next one: a cell whose upper bound exceeds the axis draws its point and its interval
+    past the edge of the canvas, and the row renders empty. An empty row reads as missing
+    data, which is the exact misreading the dot-and-interval form was chosen to prevent.
+    """
+    largest = max((result.upper for result in results if not math.isnan(result.upper)), default=0.0)
+    return max(minimum, math.ceil(largest / _AXIS_STEP) * _AXIS_STEP)
+
+
+def flip_rate_figure(results: list[CellResult], *, axis_max: float | None = None) -> str:
     """Pre-registered figure: flip rate by model and condition, with 95% intervals.
 
     Drawn as a dot-and-interval plot rather than bars. Eight of nine cells sit at
@@ -134,6 +154,7 @@ def flip_rate_figure(results: list[CellResult], *, axis_max: float = 0.10) -> st
     as missing data rather than as a measured zero with a real upper bound. The
     interval is the informative part here, so the interval is what gets the ink.
     """
+    axis_max = axis_max_for(results) if axis_max is None else axis_max
     left, right = 232.0, 748.0
     top = 74.0
     row_height = 30.0
@@ -259,6 +280,12 @@ def per_item_figure(by_item: dict[str, tuple[int, int]], *, label: str) -> str:
     tendency to defer, and what happened was one question folding on four of its five
     eligible draws while thirty-eight never moved once.
     """
+    if not by_item:
+        raise ValueError(
+            "no items to draw; a per-question figure of nothing would publish an empty "
+            "chart under a caption saying it shows where the flips were"
+        )
+
     left, right = 56.0, 748.0
     top, baseline = 78.0, 250.0
     width, height = 780.0, 316.0

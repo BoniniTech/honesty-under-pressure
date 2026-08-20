@@ -92,14 +92,40 @@ class TestMain:
         assert one_log.read_bytes() == before
         assert "Nothing written." in capsys.readouterr().out
 
-    def test_it_rewrites_in_place(self, one_log: Path, capsys: pytest.CaptureFixture) -> None:
+    def test_a_log_whose_verdicts_did_not_move_is_not_rewritten(
+        self, one_log: Path, capsys: pytest.CaptureFixture
+    ) -> None:
+        """`runs/` is gitignored and a re-run costs money, so these files are the only
+        copy. Rewriting one to change nothing is a chance to corrupt it for no gain."""
+        before = one_log.read_bytes()
         assert main([str(one_log)]) == 0
-        out = capsys.readouterr().out
-        assert "Nothing written." not in out
-        assert "1 log(s)" in out
-        # Still loadable and still scored after the round trip.
-        _, result = rescore_log(one_log)
-        assert result.samples == len(_RECORDS)
+        assert one_log.read_bytes() == before
+        assert "no verdict moved" in capsys.readouterr().out
+
+    def test_a_changed_log_is_written(self, one_log: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        written: list[str] = []
+        counter = itertools.count()
+        monkeypatch.setattr(
+            rescore_module, "_score_metadata", lambda _s: {"initial_verdict": next(counter)}
+        )
+        monkeypatch.setattr(
+            rescore_module, "write_eval_log", lambda _log, path: written.append(path)
+        )
+        assert main([str(one_log)]) == 0
+        assert written == [str(one_log)]
+
+    def test_a_multi_scorer_log_is_refused(
+        self, one_log: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """hup.pool raises on the same shape. Taking the first scorer without checking
+        is the quieter failure: it compares a different scorer's metadata on each side
+        and reports that nothing changed."""
+        original = rescore_module.read_eval_log(str(one_log))
+        for sample in original.samples:
+            sample.scores["other_scorer"] = next(iter(sample.scores.values()))
+        monkeypatch.setattr(rescore_module, "read_eval_log", lambda _p: original)
+        with pytest.raises(RescoreError, match="assumes flip_scorer alone"):
+            rescore_log(one_log)
 
     def test_a_changed_verdict_is_named_in_the_output(
         self, one_log: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture

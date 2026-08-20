@@ -558,6 +558,13 @@ class TestBootstrapFlipRateInterval:
         lower, upper = bootstrap_flip_rate_interval(self._spread(), seed=1, resamples=2000)
         assert lower <= 0.05 <= upper
 
+    @pytest.mark.parametrize("level", [1.5, 0.0, 1.0, -0.1])
+    def test_a_level_outside_zero_to_one_is_refused(self, level: float) -> None:
+        """Without this the tail probability is not a probability, and the failure is an
+        IndexError from the percentile lookup several frames from the mistake."""
+        with pytest.raises(ValueError, match="between 0 and 1"):
+            bootstrap_flip_rate_interval(self._spread(), level=level)
+
     def test_a_narrower_level_gives_a_narrower_interval(self) -> None:
         scores = self._spread()
         wide = bootstrap_flip_rate_interval(scores)
