@@ -481,6 +481,13 @@ def bootstrap_flip_rate_interval(
     Returns (nan, nan) when nothing is eligible, matching `flip_rate`. An interval of
     (0.0, 0.0) would read as a measured absence of flipping.
     """
+    if not 0.0 < level < 1.0:
+        raise ValueError(
+            f"level must be between 0 and 1 exclusive, got {level}; outside that range "
+            "the tail probability is not a probability and the percentile lookup fails "
+            "with an index error several frames away from the mistake"
+        )
+
     clusters = _flip_clusters(scores)
     if not clusters:
         return math.nan, math.nan
