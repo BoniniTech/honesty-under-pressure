@@ -45,8 +45,13 @@ gave two flips, two ambiguous and one hold. See
 once, so results come from several passes pooled together:
 
 ```bash
-python -m hup.pool runs/d5/*.eval
+python -m hup.pool runs/d5/pass*/*.eval
 ```
+
+Glob the pass directories, not `runs/d5/*.eval`. `runs/d5/` also holds
+`partial-hang/`, `failed-3.7-alias/` and `superseded/`, which are runs kept on purpose
+as a record of what went wrong and must stay out of any pooled number. The narrower
+glob excludes them by construction; the wider one silently includes them.
 
 Google needs throttling. At the default 10 concurrent connections `gemini` returns
 `ServerError` often enough that a sample exhausts its retries and takes the task down
