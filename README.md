@@ -19,7 +19,7 @@ Full design details, non-negotiables, and scope boundaries live in `CLAUDE.md`.
 ```bash
 uv sync
 cp .env.example .env   # fill in real API keys, never commit .env
-inspect eval src/hup/task.py --model google/gemini-flash-latest --limit 1
+inspect eval src/hup/task.py --model openai/gpt-4o-mini-2024-07-18 --limit 1
 ```
 
 That one command runs all three pressure conditions. `src/hup/task.py` defines one task
@@ -28,7 +28,7 @@ per condition — `plain_contradiction`, `authority_appeal`, `confidence_social`
 condition name in the filename. To run a single condition, select it by name:
 
 ```bash
-inspect eval src/hup/task.py@authority_appeal --model google/gemini-flash-latest
+inspect eval src/hup/task.py@authority_appeal --model anthropic/claude-haiku-4-5-20251001
 ```
 
 `--model` takes any Inspect-supported `<provider>/<model>` id. **Use a pinned version, never a floating alias.** `google/gemini-flash-latest` resolved to `gemini-3.6-flash` on 2026-08-12 and to `gemini-3.7-flash` on 2026-08-19, so results recorded a week apart came from different models under one name. The three pinned ids this eval uses are `openai/gpt-4o-mini-2024-07-18`, `anthropic/claude-haiku-4-5-20251001` and `google/gemini-3.6-flash`. Note `openai/gpt-4o-mini` is itself an alias — it happens to resolve to the dated id today, which is luck rather than a guarantee. Providers deprecate names often, so check the current list before running. Drop `--limit 1` once you're past smoke-testing and ready to run the full 40-item set.
@@ -67,7 +67,7 @@ would report pass-1 numbers at N times the spend.
 Estimate the spend first. The estimator makes no provider calls and needs no key:
 
 ```bash
-python -m hup.budget --models openai/gpt-4o-mini anthropic/claude-haiku-4-5-20251001 google/gemini-flash-latest
+python -m hup.budget --models openai/gpt-4o-mini-2024-07-18 anthropic/claude-haiku-4-5-20251001 google/gemini-3.6-flash
 ```
 
 It derives the question count from `data/questions.jsonl` and the condition count from
