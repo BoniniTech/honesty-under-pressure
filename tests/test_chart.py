@@ -63,7 +63,7 @@ def _cell(model: str, condition: str, scores: list[SampleScore]) -> dict[Cell, P
     return {cell: PooledCell(cell, scores, 1, [len(scores)])}
 
 
-def _d5_shaped() -> list[SampleScore]:
+def _full_run_shaped() -> list[SampleScore]:
     """The real shape: q010 flips 4 of 5, q016 flips 2 of 4, 38 questions clean."""
     scores = [_score("correct", "wrong", "q010")] * 4 + [_score("correct", "correct", "q010")]
     scores += [_score("correct", "wrong", "q016")] * 2
@@ -106,7 +106,7 @@ class TestLabels:
 
 class TestCellResults:
     def test_rate_and_interval_come_from_the_scores(self) -> None:
-        results = cell_results(_cell("anthropic/x", "authority_appeal", _d5_shaped()))
+        results = cell_results(_cell("anthropic/x", "authority_appeal", _full_run_shaped()))
         assert len(results) == 1
         assert results[0].flips == 6
         assert results[0].rate == pytest.approx(6 / 237)
@@ -135,7 +135,7 @@ class TestCellResults:
 
 class TestFlipRateFigure:
     def test_every_cell_reaches_the_figure(self) -> None:
-        results = cell_results(_cell("anthropic/x", "authority_appeal", _d5_shaped()))
+        results = cell_results(_cell("anthropic/x", "authority_appeal", _full_run_shaped()))
         svg = flip_rate_figure(results)
         assert "0.0253" in svg or "0.0254" in svg
         assert "authority appeal" in svg
@@ -143,24 +143,24 @@ class TestFlipRateFigure:
     def test_the_figure_is_well_formed_xml(self) -> None:
         """Hand-rolled markup with no parser in the loop. A malformed attribute renders
         as a blank box in the README and nothing else would catch it."""
-        results = cell_results(_cell("anthropic/x", "authority_appeal", _d5_shaped()))
+        results = cell_results(_cell("anthropic/x", "authority_appeal", _full_run_shaped()))
         root = ElementTree.fromstring(flip_rate_figure(results))
         assert root.tag.endswith("svg")
 
     def test_rendering_twice_gives_identical_bytes(self) -> None:
         """The committed SVG is reviewed as a diff, so a diff has to mean a number
         moved rather than a coordinate jittering."""
-        results = cell_results(_cell("anthropic/x", "authority_appeal", _d5_shaped()))
+        results = cell_results(_cell("anthropic/x", "authority_appeal", _full_run_shaped()))
         assert flip_rate_figure(results) == flip_rate_figure(results)
 
     def test_the_figure_says_the_zero_cells_are_bounded_not_measured(self) -> None:
-        results = cell_results(_cell("anthropic/x", "authority_appeal", _d5_shaped()))
+        results = cell_results(_cell("anthropic/x", "authority_appeal", _full_run_shaped()))
         assert "bounded at 0.0881, not measured at zero" in flip_rate_figure(results)
 
     def test_a_model_is_named_once_across_its_conditions(self) -> None:
         """Three rows per model, one label. A repeated name reads as three models."""
-        pooled = _cell("anthropic/x", "authority_appeal", _d5_shaped())
-        pooled.update(_cell("anthropic/x", "plain_contradiction", _d5_shaped()))
+        pooled = _cell("anthropic/x", "authority_appeal", _full_run_shaped())
+        pooled.update(_cell("anthropic/x", "plain_contradiction", _full_run_shaped()))
         svg = flip_rate_figure(cell_results(pooled))
         assert svg.count(">x<") == 1
         assert ">authority appeal<" in svg
@@ -206,7 +206,7 @@ class TestPerItemFigure:
 
 class TestFlippingCell:
     def test_it_picks_the_cell_with_the_most_flips(self) -> None:
-        many = cell_results(_cell("a/x", "authority_appeal", _d5_shaped()))[0]
+        many = cell_results(_cell("a/x", "authority_appeal", _full_run_shaped()))[0]
         none = cell_results(
             _cell("b/x", "plain_contradiction", [_score("correct", "correct", "q1")])
         )[0]
@@ -229,7 +229,7 @@ class TestFlippingCell:
 
 class TestMain:
     def test_it_writes_both_figures(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        pooled = _cell("anthropic/x", "authority_appeal", _d5_shaped())
+        pooled = _cell("anthropic/x", "authority_appeal", _full_run_shaped())
         monkeypatch.setattr("hup.chart.load_cells", lambda _paths: pooled)
 
         assert main([str(tmp_path / "fake.eval"), "--output-dir", str(tmp_path / "out")]) == 0
@@ -245,7 +245,7 @@ class TestMain:
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture,
     ) -> None:
-        pooled = _cell("anthropic/x", "authority_appeal", _d5_shaped())
+        pooled = _cell("anthropic/x", "authority_appeal", _full_run_shaped())
         # Patched on hup.pool, not hup.chart: runpy imports a fresh hup.chart module,
         # and its `from hup.pool import load_cells` binds whatever hup.pool holds then.
         monkeypatch.setattr("hup.pool.load_cells", lambda _paths: pooled)
@@ -268,10 +268,10 @@ class TestAxisMax:
     dot-and-interval form was chosen to prevent.
     """
 
-    def test_the_d5_shape_still_lands_on_a_tenth(self) -> None:
-        """The fix must not move the published figure. Max upper in the D5 run is
+    def test_the_full_run_shape_still_lands_on_a_tenth(self) -> None:
+        """The fix must not move the published figure. Max upper in the full run is
         0.0881, which rounds up to the 0.10 floor."""
-        results = cell_results(_cell("anthropic/x", "authority_appeal", _d5_shaped()))
+        results = cell_results(_cell("anthropic/x", "authority_appeal", _full_run_shaped()))
         assert axis_max_for(results) == pytest.approx(0.10)
 
     def test_a_wide_interval_widens_the_axis(self) -> None:

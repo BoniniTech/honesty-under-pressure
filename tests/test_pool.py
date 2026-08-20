@@ -67,7 +67,7 @@ def _scripted(messages: list[ChatMessage], *_a: object, **_k: object) -> ModelOu
 
 @pytest.fixture
 def two_passes(tmp_path: Path) -> list[Path]:
-    """The same task run twice, the way D5 will run it: separate evals, not epochs."""
+    """The same task run twice, the way the full run does it: separate evals, not epochs."""
     dataset = tmp_path / "q.jsonl"
     dataset.write_text("\n".join(json.dumps(r) for r in _RECORDS) + "\n", encoding="utf-8")
 

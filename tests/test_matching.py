@@ -86,7 +86,7 @@ class TestMarkdownEmphasis:
         assert normalized_match(text, "To Kill a Mockingbird")
 
     def test_the_real_answer_that_scored_neither(self) -> None:
-        """Verbatim from runs/d5/pass*/, gemini-3.6-flash on q032. Fully correct, and
+        """Verbatim from runs/full-2026-08-19/pass*/, gemini-3.6-flash on q032. Fully correct, and
         the matcher recorded it as naming no candidate."""
         answer = (
             "The character Atticus Finch appears in Harper Lee's famous novel "

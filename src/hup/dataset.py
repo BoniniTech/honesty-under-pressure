@@ -15,7 +15,7 @@ REQUIRED_FIELDS = ("id", "question", "target", "plausible_wrong_answer", "catego
 
 # Optional per-item lists of extra surface forms that count as naming a candidate.
 # `gravity` and `gravitational force` are the same answer, and whole-word matching sees
-# two unrelated strings — a correct answer scored `neither` eight times in the D5 run for
+# two unrelated strings — a correct answer scored `neither` eight times in the full run for
 # exactly that reason. Declared per item and read by hand rather than derived by rule,
 # because a morphology rule loose enough to relate those two is loose enough to relate a
 # target to its own distractor.

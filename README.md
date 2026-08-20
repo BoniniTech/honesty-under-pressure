@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/BoniniTech/honesty-under-pressure/actions/workflows/ci.yml/badge.svg)](https://github.com/BoniniTech/honesty-under-pressure/actions/workflows/ci.yml)
 
-Six pooled passes against three pinned models on 2026-08-19, 2,160 samples. Every number below regenerates from `runs/d5/pass*/*.eval`, and the run record — including which runs were excluded and why, and two corrections made after the fact — is `runs/summaries/d5-2026-08-19.md`.
+Six pooled passes against three pinned models on 2026-08-19, 2,160 samples. Every number below regenerates from `runs/full-2026-08-19/pass*/*.eval`, and the run record — including which runs were excluded and why, and two corrections made after the fact — is `runs/summaries/full-2026-08-19.md`.
 
 ## Motivation
 
@@ -123,14 +123,14 @@ gave two flips, two ambiguous and one hold. See
 once, so results come from several passes pooled together:
 
 ```bash
-python -m hup.pool runs/d5/pass*/*.eval
+python -m hup.pool runs/full-2026-08-19/pass*/*.eval
 ```
 
-Glob the pass directories, not `runs/d5/*.eval`. `runs/d5/` also holds
-`partial-hang/`, `failed-3.7-alias/`, `superseded/` and `pre-rescore/`, which are runs
-kept on purpose — three as a record of what went wrong, one as the original scoring of
-the passes themselves — and all four must stay out of any pooled number. The narrower
-glob excludes them by construction; the wider one silently includes them.
+Glob the pass directories, not `runs/full-2026-08-19/*.eval`. `runs/full-2026-08-19/`
+also holds `partial-hang/`, `failed-3.7-alias/`, `superseded/` and `pre-rescore/`, which
+are runs kept on purpose — three as a record of what went wrong, one as the original
+scoring of the passes themselves — and all four must stay out of any pooled number. The
+narrower glob excludes them by construction; the wider one silently includes them.
 
 Google needs throttling. At the default 10 concurrent connections `gemini` returns
 `ServerError` often enough that a sample exhausts its retries and takes the task down
@@ -202,12 +202,12 @@ condition:
 
 ```bash
 for pass in 1 2 3 4 5 6; do
-  inspect eval src/hup/task.py --model openai/gpt-4o-mini-2024-07-18 --log-dir runs/d5/pass$pass
-  inspect eval src/hup/task.py --model anthropic/claude-haiku-4-5-20251001 --log-dir runs/d5/pass$pass
-  inspect eval src/hup/task.py --model google/gemini-3.6-flash --log-dir runs/d5/pass$pass --max-connections 5
+  inspect eval src/hup/task.py --model openai/gpt-4o-mini-2024-07-18 --log-dir runs/full-2026-08-19/pass$pass
+  inspect eval src/hup/task.py --model anthropic/claude-haiku-4-5-20251001 --log-dir runs/full-2026-08-19/pass$pass
+  inspect eval src/hup/task.py --model google/gemini-3.6-flash --log-dir runs/full-2026-08-19/pass$pass --max-connections 5
 done
 
-python -m hup.pool runs/d5/pass*/*.eval
+python -m hup.pool runs/full-2026-08-19/pass*/*.eval
 ```
 
 Everything else comes from the task defaults in `src/hup/task.py`: `token_limit` 10,000,
@@ -217,7 +217,7 @@ left at each provider's default, so passes differ, which is the point of running
 A scorer change can be applied to logs you already have, without paying for a run:
 
 ```bash
-python -m hup.rescore runs/d5/pass*/*.eval
+python -m hup.rescore runs/full-2026-08-19/pass*/*.eval
 ```
 
 This is how the markdown-emphasis fix reached the table above. It works because the
@@ -245,7 +245,7 @@ is where a human can review them, and the cost of that choice is exactly this.
 Inspect does not record the command line, so the block above is reconstructed from what
 the logs say was in force rather than copied from a shell history. That distinction
 earned its keep: three of this run's 54 logs were written before the commit that added
-the last three of those settings, and `runs/summaries/d5-2026-08-19.md` records what
+the last three of those settings, and `runs/summaries/full-2026-08-19.md` records what
 that does and does not affect. The per-call `ModelEvent` config in a log is the view that
 answers the question. `eval.model_generate_config` is not, because it holds the
 CLI-level config and reads as `None` even where the task set a value.
@@ -254,9 +254,10 @@ CLI-level config and reads as `None` even where the task set a value.
 
 Six passes over the full set on 2026-08-19. 40 questions × 3 pressure conditions × 3
 models × 6 passes = 2,160 samples, on `inspect-ai==0.3.255`, models by pinned version.
-Regenerate the table with `python -m hup.pool runs/d5/pass*/*.eval` and the figures with
-`python -m hup.chart runs/d5/pass*/*.eval`. Both figures are committed, because `runs/`
-is gitignored and regenerating them from a clean clone means paying for a fresh run.
+Regenerate the table with `python -m hup.pool runs/full-2026-08-19/pass*/*.eval` and the
+figures with `python -m hup.chart runs/full-2026-08-19/pass*/*.eval`. Both figures are
+committed, because `runs/` is gitignored and regenerating them from a clean clone means
+paying for a fresh run.
 
 | model | condition | n | flip rate | 95% CI | init. acc | ambig | trunc | eligible |
 |---|---|---:|---:|:-:|---:|---:|---:|---:|

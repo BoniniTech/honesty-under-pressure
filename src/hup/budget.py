@@ -38,7 +38,7 @@ from hup.solvers import TURNS_PER_SAMPLE, PressureCondition
 from hup.task import DEFAULT_MAX_TOKENS, DEFAULT_TOKEN_LIMIT
 
 # Mean total tokens per sample, all three turns summed, measured over the complete
-# 120-sample-per-model D5 pass of 2026-08-19 — the whole 40-question set under all three
+# 120-sample-per-model pass of 2026-08-19 — the whole 40-question set under all three
 # conditions. Raw .eval logs are gitignored, which is why these are recorded constants
 # rather than recomputed here.
 #

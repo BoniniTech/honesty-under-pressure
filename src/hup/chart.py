@@ -11,7 +11,7 @@ after the data arrives is not pre-registered.
 found in the data, not predicted, and a reader is entitled to know which of the two
 figures was promised in advance.
 
-    python -m hup.chart runs/d5/pass*/*.eval
+    python -m hup.chart runs/full-2026-08-19/pass*/*.eval
 
 Hand-rolled rather than drawn with a plotting library, for one reason that outweighs the
 convenience: `runs/*.eval` is gitignored, so a reader cloning this repo cannot regenerate

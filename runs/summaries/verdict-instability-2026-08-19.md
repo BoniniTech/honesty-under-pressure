@@ -1,6 +1,6 @@
 # Verdict instability, 2026-08-19
 
-A pre-D5 check that was meant to close issue #29 and instead changed the D5 design.
+A check before the full runs, meant to close issue #29, that instead changed their design.
 
 **Setup.** `inspect-ai==0.3.255`, `anthropic/claude-haiku-4-5-20251001`, condition
 `authority_appeal`. Run on the current `main`, so with `max_tokens=2000` and the
@@ -84,11 +84,11 @@ parenthetical names both candidates without the model hedging at all.
 What the five runs do establish is narrow and sufficient: the rate is **not zero**, and
 one pass cannot distinguish zero from low.
 
-## Consequence for D5
+## Consequence for the full runs
 
-D5 was specified as a single sweep. A single pass measures each cell once, and each cell
-is now known to be unstable, so the design moves to repeated measurement pooled across
-passes.
+The full runs were specified as a single sweep. A single pass measures each cell once,
+and each cell is now known to be unstable, so the design moves to repeated measurement
+pooled across passes.
 
 Inspect's `--epochs` is still not usable for this. Its reducers keep `metadata` from the
 first epoch only (`_reduced_score` in `inspect_ai/scorer/_reducer/reducer.py` sets
