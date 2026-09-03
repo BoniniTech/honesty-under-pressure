@@ -5,14 +5,14 @@
 - **Local checkout:** machine-specific — use the session's working directory. Keep the checkout outside any cloud-synced folder: sync clients race git over `.git/index` and can corrupt the working tree.
 
 ## What this project is
-An evaluation built on Inspect AI (UK AISI's open-source eval framework). It measures whether frontier LLMs maintain correct factual answers when a user applies conversational pressure to change them. This is a public portfolio piece for AI-safety evaluations-engineering applications: reviewers will read the code, the results writeup, AND the commit history. Treat all three as deliverables.
+An evaluation built on Inspect AI (UK AISI's open-source eval framework). It measures whether frontier LLMs maintain correct factual answers when a user applies conversational pressure to change them. It is written to be read in public: the code, the results writeup, AND the commit history are all deliverables, and all three are held to the same bar.
 
 ## Non-negotiables
 1. **Honest results only.** Never fabricate, extrapolate, cherry-pick, or smooth over anomalous data. Anomalies are findings — they go in the writeup, not in the trash. If a run is broken, say the run was broken.
 2. **Cut scope, never rigor.** A small eval done properly beats an ambitious eval done sloppily. v0.1 shipped under this rule and v0.2 inherits it: when something has to give, the thing that gives is how much the eval covers, never how carefully it measures.
 3. **Reproducibility.** Every number in the README must be regenerable from a clean clone plus API keys. Pin dependencies. Seed anything seedable. Log model versions and dates for every run.
 4. **No hazardous or dual-use content anywhere in this repo** — not in the dataset, examples, comments, or writeup. Topic stays strictly on factual-honesty behavior.
-5. **Human oversight is part of the artifact.** The maintainer reviews every PR, and nothing reaches `main` without that review. Oversight sits at the PR boundary, not at each commit, so the history has to stand on its own: small, atomic commits with messages that explain *why*. No giant "initial commit" dumps, no auto-committed slop. This repo demonstrates responsible coding-agent use to people who evaluate exactly that.
+5. **Human oversight is part of the artifact.** The maintainer reviews every PR, and nothing reaches `main` without that review. Oversight sits at the PR boundary, not at each commit, so the history has to stand on its own: small, atomic commits with messages that explain *why*. No giant "initial commit" dumps, no auto-committed slop. Most of the code here was written by a coding agent, so the history is the only evidence that the oversight actually happened.
 6. **Check current Inspect docs before writing Inspect code.** The API evolves; do not code from trained memory. Read the official docs/examples for solvers, scorers, and datasets at the current version, and record the inspect-ai version used.
 
 ## The eval design (v0.1 scope — do not expand without the maintainer's sign-off)
@@ -128,7 +128,7 @@ carries motivation, method, a nine-step walkthrough of one question end to end, 
 a substantive Limitations section, and what comes next.
 
 The bar the history has to clear is the same as the bar for the code: it should read as a
-sequence of reviewed, intentional changes, because reviewers read it.
+sequence of reviewed, intentional changes, because anyone reading the repo reads it too.
 
 ## Out of scope for v0.1, and why they are named
 Listed so the boundary of what shipped is legible, not as a roadmap. Anything here is a
@@ -138,5 +138,5 @@ v0.2 conversation, and the tracked ones live as issues on the `v0.2` milestone.
 - Sweeping pressure intensity / multi-round escalation
 - Fine-grained persona-based pressure sources
 
-## What a reviewer should be able to conclude in 10 minutes
-That the author designs evaluations with methodological care (pre-registered scope, tested scorers, honest limitations), writes maintainable code, uses coding agents with real oversight, and communicates findings plainly. Every decision in this repo should serve one of those four impressions.
+## What a reader should be able to conclude in 10 minutes
+That the eval was designed with methodological care (pre-registered scope, tested scorers, honest limitations), that the code is maintainable, that the coding agent which wrote most of it was overseen, and that the findings are stated plainly. Every decision in this repo should serve one of those four.
