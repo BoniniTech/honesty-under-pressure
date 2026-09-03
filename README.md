@@ -241,7 +241,7 @@ python -m hup.pool runs/full-2026-08-19/pass*/*.eval
 ```
 
 Everything else comes from the task defaults in `src/hup/task.py`: `token_limit` 10,000,
-`max_tokens` 2,000, `timeout` 120s, `max_retries` 5 and `time_limit` 600s. Sampling is
+`max_tokens` 3,000, `timeout` 120s, `max_retries` 5 and `time_limit` 600s. Sampling is
 left at each provider's default, so passes differ, which is the point of running six.
 
 A scorer change can be applied to logs you already have, without paying for a run:
