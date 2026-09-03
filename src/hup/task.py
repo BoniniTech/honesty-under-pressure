@@ -6,6 +6,11 @@ sweep the default:
 
     inspect eval src/hup/task.py --model <model>          # all three conditions
     inspect eval src/hup/task.py@authority_appeal ...     # one condition
+    inspect eval src/hup/task.py --model <model> -T rounds=3   # escalate over 3 rounds
+
+`rounds` is the depth of the pushback ladder and defaults to 1, the shape every
+published v0.1 number was produced under. Passing it explicitly puts the depth in the
+log's `task_args` as well as in each sample's score metadata.
 
 The task name is the condition name, so it lands in the log filename and the
 per-condition breakdown joins on it without a separate manifest.
@@ -20,7 +25,7 @@ from inspect_ai.model import GenerateConfig
 
 from hup.dataset import DEFAULT_DATA_PATH, load_dataset
 from hup.scorers import flip_scorer
-from hup.solvers import PressureCondition, pressure_solver
+from hup.solvers import DEFAULT_ROUNDS, PressureCondition, pressure_solver
 
 # Per-sample ceiling, not a run budget. Inspect has no run-level cap: every limit it
 # exposes applies to a single sample, so total spend is bounded by arithmetic over the
@@ -98,19 +103,25 @@ DEFAULT_MAX_RETRIES = 5
 DEFAULT_TIME_LIMIT = 600
 
 
-def _pressure_task(condition: PressureCondition, dataset_path: str | Path) -> Task:
-    """Ask, push back under `condition`, then score the final answer.
+def _pressure_task(
+    condition: PressureCondition, dataset_path: str | Path, rounds: int | str
+) -> Task:
+    """Ask, push back under `condition` for `rounds` rounds, then score the final answer.
 
-    `dataset_path` is coerced to Path because Inspect hands `-T` task arguments
-    through from the command line as strings.
+    `dataset_path` is coerced to Path and `rounds` to int because Inspect hands `-T`
+    task arguments through from the command line as strings. `pressure_solver` does the
+    coercing and the bounds check, so a bad `-T rounds=` fails while the task is being
+    built rather than part-way through a paid sweep.
 
     The token limit is a task default. `--token-limit` on the command line overrides
     it, so the cap is configurable without editing this file, and the same holds for
-    `--max-tokens`, `--timeout`, `--max-retries` and `--time-limit`.
+    `--max-tokens`, `--timeout`, `--max-retries` and `--time-limit`. `rounds` is not
+    among them — it changes what the eval measures, not how much it is allowed to spend,
+    so it is a task argument and lands in the log beside the results it produced.
     """
     return Task(
         dataset=load_dataset(Path(dataset_path)),
-        solver=pressure_solver(condition),
+        solver=pressure_solver(condition, rounds),
         scorer=flip_scorer(),
         config=GenerateConfig(
             max_tokens=DEFAULT_MAX_TOKENS,
@@ -123,18 +134,24 @@ def _pressure_task(condition: PressureCondition, dataset_path: str | Path) -> Ta
 
 
 @task
-def plain_contradiction(dataset_path: str | Path = DEFAULT_DATA_PATH) -> Task:
+def plain_contradiction(
+    dataset_path: str | Path = DEFAULT_DATA_PATH, rounds: int | str = DEFAULT_ROUNDS
+) -> Task:
     """Pushback that just asserts the wrong answer, with no source or confidence."""
-    return _pressure_task("plain_contradiction", dataset_path)
+    return _pressure_task("plain_contradiction", dataset_path, rounds)
 
 
 @task
-def authority_appeal(dataset_path: str | Path = DEFAULT_DATA_PATH) -> Task:
+def authority_appeal(
+    dataset_path: str | Path = DEFAULT_DATA_PATH, rounds: int | str = DEFAULT_ROUNDS
+) -> Task:
     """Pushback that attributes the wrong answer to a professor and a textbook."""
-    return _pressure_task("authority_appeal", dataset_path)
+    return _pressure_task("authority_appeal", dataset_path, rounds)
 
 
 @task
-def confidence_social(dataset_path: str | Path = DEFAULT_DATA_PATH) -> Task:
+def confidence_social(
+    dataset_path: str | Path = DEFAULT_DATA_PATH, rounds: int | str = DEFAULT_ROUNDS
+) -> Task:
     """Pushback that states certainty and claims everyone agrees."""
-    return _pressure_task("confidence_social", dataset_path)
+    return _pressure_task("confidence_social", dataset_path, rounds)

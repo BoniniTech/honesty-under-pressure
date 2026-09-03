@@ -25,6 +25,7 @@ from inspect_ai import eval as inspect_eval
 from inspect_ai.model import ChatMessage, ModelOutput
 
 from hup.budget import (
+    OBSERVED_MEAN_ROUNDS,
     OBSERVED_MEAN_TOKENS_PER_SAMPLE,
     UNMEASURED_MEAN_TOKENS_PER_SAMPLE,
     SweepEstimate,
@@ -32,7 +33,12 @@ from hup.budget import (
     format_estimate,
     main,
 )
-from hup.solvers import TURNS_PER_SAMPLE, PressureCondition
+from hup.solvers import (
+    DEFAULT_ROUNDS,
+    MAX_ROUNDS,
+    PressureCondition,
+    turns_per_sample,
+)
 from hup.task import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MAX_TOKENS,
@@ -171,7 +177,7 @@ def test_estimate_derives_conditions_from_the_solver(tmp_path: Path) -> None:
 def test_sample_and_call_arithmetic(tmp_path: Path) -> None:
     estimate = _estimate(dataset_path=_dataset(tmp_path / "q.jsonl", 10))
     assert estimate.samples == 10 * estimate.conditions * 3
-    assert estimate.generate_calls == estimate.samples * TURNS_PER_SAMPLE
+    assert estimate.generate_calls == estimate.samples * turns_per_sample(estimate.rounds)
 
 
 def _fixed_estimate(**overrides: object) -> SweepEstimate:
@@ -180,6 +186,7 @@ def _fixed_estimate(**overrides: object) -> SweepEstimate:
         "conditions": 3,
         "models": ("a", "b", "c"),
         "passes": 1,
+        "rounds": OBSERVED_MEAN_ROUNDS,
         "token_limit": 10_000,
         "max_tokens": 2_000,
         "mean_tokens_by_model": {"a": 100, "b": 200, "c": 300},
@@ -236,8 +243,8 @@ def test_ceiling_adds_a_bounded_overshoot_to_the_worst_case() -> None:
     """The limit is checked between turns, so a sample is billed for the response it had
     already committed to. max_tokens is what bounds that response."""
     estimate = _fixed_estimate()
-    assert estimate.overshoot_per_sample == TURNS_PER_SAMPLE * 2_000
-    assert estimate.ceiling_tokens == 360 * (10_000 + 6_000)
+    assert estimate.overshoot_per_sample == turns_per_sample(estimate.rounds) * 2_000
+    assert estimate.ceiling_tokens == 360 * (10_000 + 3 * 2_000)
     assert estimate.ceiling_tokens > estimate.worst_case_tokens
 
 
@@ -313,6 +320,76 @@ def test_main_prints_an_estimate_and_exits_zero(capsys: pytest.CaptureFixture) -
     assert "models             2" in out
 
 
+def test_rounds_default_to_the_shape_the_published_results_used() -> None:
+    """The README's reproduction command passes no depth, and the numbers it regenerates
+    came from a single round of pushback. A default of anything else would make that
+    command quietly describe a different experiment from the one beside it."""
+    assert DEFAULT_ROUNDS == OBSERVED_MEAN_ROUNDS == 1
+    assert _estimate().rounds == DEFAULT_ROUNDS
+
+
+def test_each_round_adds_a_turn_to_every_sample() -> None:
+    """Rounds multiply the bill roughly linearly, which is the trade against passes the
+    run shape is chosen on."""
+    one, three = _estimate(rounds=1), _estimate(rounds=3)
+    assert one.turns == 3
+    assert three.turns == 5
+    assert three.generate_calls == three.samples * 5
+    assert three.samples == one.samples
+
+
+def test_a_deeper_ladder_scales_the_projection_by_turn_count() -> None:
+    """The scale is arithmetic off a one-round measurement, so it is pinned to the ratio
+    it claims to be rather than left to drift into a fudge factor."""
+    estimate = _estimate(rounds=3)
+    assert estimate.round_scale == pytest.approx(5 / 3)
+    assert estimate.observed_case_tokens > _estimate(rounds=1).observed_case_tokens
+
+
+def test_a_projection_at_the_measured_depth_is_not_scaled() -> None:
+    estimate = _estimate(rounds=OBSERVED_MEAN_ROUNDS)
+    assert estimate.scaled_rounds is False
+    assert estimate.round_scale == 1.0
+
+
+def test_format_says_when_the_projection_is_arithmetic_rather_than_measured() -> None:
+    """The 1.67x carried into the slate-selection summary was turn-count arithmetic that
+    read like a measurement. Whoever approves a budget has to be told which it is, and
+    told which direction the error runs."""
+    text = format_estimate(_estimate(rounds=3))
+    assert "1.67x" in text
+    assert "errs LOW" in text
+    assert "floor" in text
+
+
+def test_format_stays_quiet_at_the_measured_depth() -> None:
+    assert "errs LOW" not in format_estimate(_estimate(rounds=1))
+
+
+def test_the_ceiling_grows_with_the_ladder() -> None:
+    """The overshoot is one response per turn, so a deeper ladder raises the number a
+    sweep cannot exceed even though token_limit has not moved."""
+    one, three = _estimate(rounds=1), _estimate(rounds=3)
+    assert three.overshoot_per_sample == 5 * DEFAULT_MAX_TOKENS
+    assert three.ceiling_tokens > one.ceiling_tokens
+    assert three.worst_case_tokens == one.worst_case_tokens
+
+
+@pytest.mark.parametrize("rounds", [0, -1, MAX_ROUNDS + 1])
+def test_estimate_refuses_a_depth_the_solver_would_refuse(rounds: int) -> None:
+    """Bounds-checked through the solver, so the estimate cannot describe a sweep that
+    `inspect eval` would reject at the first task it builds."""
+    with pytest.raises(ValueError, match="rounds must be at"):
+        estimate_sweep(models=["a"], rounds=rounds)
+
+
+def test_main_accepts_a_round_count(capsys: pytest.CaptureFixture) -> None:
+    assert main(["--models", "openai/gpt-4o-mini", "--rounds", "3", "--passes", "4"]) == 0
+    out = capsys.readouterr().out
+    assert "pushback rounds    3" in out
+    assert "(5 turns per sample)" in out
+
+
 def test_main_requires_models(capsys: pytest.CaptureFixture) -> None:
     with pytest.raises(SystemExit):
         main([])
@@ -358,9 +435,16 @@ def _one_reply(_messages: list[ChatMessage], *_a: object, **_k: object) -> Model
 
 
 @pytest.mark.integration
-def test_turns_per_sample_matches_what_the_solver_actually_does(tmp_path: Path) -> None:
-    """TURNS_PER_SAMPLE feeds the generate-call estimate. If the solver gains a turn and
-    this constant does not, the sweep estimate under-counts and nothing else notices."""
+@pytest.mark.parametrize("rounds", range(1, MAX_ROUNDS + 1))
+def test_turns_per_sample_matches_what_the_solver_actually_does(
+    rounds: int, tmp_path: Path
+) -> None:
+    """`turns_per_sample` feeds the generate-call estimate. If the solver gains a turn and
+    this function does not, the sweep estimate under-counts and nothing else notices.
+
+    Run at every depth the ladders support rather than at the default alone. A formula
+    that happened to be right at one round and wrong at three would pass a single-depth
+    check while under-counting the run this repo is about to pay for."""
     record = {
         "id": "t001",
         "question": "What is the chemical symbol for gold?",
@@ -372,7 +456,7 @@ def test_turns_per_sample_matches_what_the_solver_actually_does(tmp_path: Path) 
     dataset.write_text(json.dumps(record) + "\n", encoding="utf-8")
 
     logs = inspect_eval(
-        plain_contradiction(dataset_path=dataset),
+        plain_contradiction(dataset_path=dataset, rounds=rounds),
         model="mockllm/model",
         model_args={"custom_outputs": _one_reply},
         log_dir=str(tmp_path / "logs"),
@@ -383,4 +467,4 @@ def test_turns_per_sample_matches_what_the_solver_actually_does(tmp_path: Path) 
     assert log.samples is not None
 
     assistant_turns = [m for m in log.samples[0].messages if m.role == "assistant"]
-    assert len(assistant_turns) == TURNS_PER_SAMPLE
+    assert len(assistant_turns) == turns_per_sample(rounds)
