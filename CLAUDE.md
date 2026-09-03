@@ -68,18 +68,24 @@ One task per branch, small atomic commits either way (non-negotiable #5). Every 
 
 When a change makes something in this file wrong — the scorer's output fields, the dataset schema, the repo structure, a documented command — the correction ships in the same PR as the change, not in a follow-up. This file is read as current by every session, so a stale line here misdirects work rather than merely aging. Tracking the drift somewhere else is not the fix.
 
-### Writing a run summary
-`runs/summaries/<run>.md` is the only part of a run a reader can see — `runs/*` is gitignored apart from `runs/summaries/`. Structure is fixed, in this order:
+### Writing up a run
+Two surfaces carry a run's numbers: `runs/summaries/<run>.md`, the record of one run, and the README's Results section, the published writeup. `runs/*` is gitignored apart from `runs/summaries/`, so between them they are everything a reader can see. Both follow the same order:
 
-1. **TL;DR above every table.** State the conclusion as it stands after every correction in the file: what the run establishes, and what it does not. Writing in the order the work happened buries it at the bottom.
-2. **Show current numbers first.** The pooled table MUST be what `python -m hup.pool` prints now, never one promoted from an earlier addendum — the addendum in `full-2026-08-19.md` predates a re-score and still reads 0.9958 on a cell that is now 1.0000.
-3. **Per-item table before the per-cell table.** A cell rate reads as a uniform tendency, and six flips from two of forty questions is not one.
-4. **Move superseded tables into a collapsible `## History`,** marked as superseded there. Never delete one; never edit one in place.
-5. **Keep corrections verbatim, in writing order, indexed above the fold.** The original order keeps every "above" inside a correction resolving. A correction folded into the text it corrects is indistinguishable from never having been wrong.
-6. **Legend every column abbreviation, one line each, on every table.** `ci_lo`, `elig` and `exc_wrong` are not self-describing.
-7. **Cite every quoted transcript** — `.eval` path, sample id, epoch. As text, not a link: the logs are gitignored, so a link is dead for exactly the reader the citation is for.
+1. **Plain-language context first.** Two or three sentences on what the eval measures and what this run was, for someone who has never opened the repo. On the README this sits at the very top, above the fold, ahead of any provenance material.
+2. **TL;DR above every table.** State the conclusion as it stands after every correction in the file: what the run establishes, and what it does not. Writing in the order the work happened buries it at the bottom.
+3. **Show current numbers first.** The pooled table MUST be what `python -m hup.pool` prints now, never one promoted from an earlier addendum — the addendum in `full-2026-08-19.md` predates a re-score and still reads 0.9958 on a cell that is now 1.0000.
+4. **Per-item table before the per-cell table.** A cell rate reads as a uniform tendency, and six flips from two of forty questions is not one.
+5. **Legend every column abbreviation, one line each, on every table.** `ci_lo`, `elig` and `exc_wrong` are not self-describing.
+6. **Cite every quoted transcript** — `.eval` path, sample id, epoch. As text, not a link: the logs are gitignored, so a link is dead for exactly the reader the citation is for.
 
-Applies to summaries written from here on, starting with the next full run. Do not retrofit existing ones — the order they were written in is part of what they record.
+Summaries carry two more, because the README publishes one set of numbers and is rewritten per run while a summary accumulates:
+
+7. **Move superseded tables into a collapsible `## History`,** marked as superseded there. Never delete one; never edit one in place.
+8. **Keep corrections verbatim, in writing order, indexed above the fold.** The original order keeps every "above" inside a correction resolving. A correction folded into the text it corrects is indistinguishable from never having been wrong.
+
+The README carries a **Latest run** link near the top, pointing at the newest `runs/summaries/<run>.md`. Update it in the same PR that adds the summary — a stale pointer there sends a reader to superseded numbers sitting under a heading that calls them current.
+
+Applies from here on, starting with the next full run. Do not retrofit existing summaries — the order they were written in is part of what they record.
 
 ### Review and merge
 - Claude commits, pushes, and opens PRs without asking first. Do not stage a diff for approval before committing — the PR is the review surface, and holding work back only delays the review. Pushing further commits to an open PR returns it to review.
