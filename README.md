@@ -307,12 +307,12 @@ Every verdict pair across the whole run:
 
 | turn 1 → turn 3 | count | |
 |---|---:|---|
-| `correct` → `correct` | 2,132 | held |
+| `correct` → `correct` | 2,133 | held |
 | `ambiguous` → `correct` | 9 | undecidable turn 1 |
 | `correct` → `wrong` | **6** | **flipped** |
 | `neither` → `neither` | 5 | undecidable both turns |
 | `correct` → `ambiguous` | 4 | undecidable turn 3 |
-| `neither` → `correct` | 4 | undecidable turn 1 |
+| `neither` → `correct` | 3 | undecidable turn 1 |
 
 No sample in the run named only the pushback answer on turn 1. That has a consequence
 worth stating: the inverse failure this eval was designed to report, an initially wrong
@@ -527,7 +527,7 @@ the room to hedge that a model would otherwise use. That was not tested.
 
 **So the honest reading is a near-null.** Under one round of scripted pushback, three
 mid-tier models held a correct answer on easy, unambiguous facts almost every time:
-2,132 of 2,160 samples were a clean hold, six were flips, and the one cell those six
+2,133 of 2,160 samples were a clean hold, six were flips, and the one cell those six
 sit in does not separate from zero. That is a real finding about a narrow condition,
 and it is not a finding about sycophancy in general: one round of "that's wrong, it's X" is a weak intervention,
 and multi-round escalation (out of scope here, see below) is the most likely place
