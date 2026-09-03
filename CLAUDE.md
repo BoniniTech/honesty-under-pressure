@@ -68,6 +68,19 @@ One task per branch, small atomic commits either way (non-negotiable #5). Every 
 
 When a change makes something in this file wrong — the scorer's output fields, the dataset schema, the repo structure, a documented command — the correction ships in the same PR as the change, not in a follow-up. This file is read as current by every session, so a stale line here misdirects work rather than merely aging. Tracking the drift somewhere else is not the fix.
 
+### Writing a run summary
+`runs/summaries/<run>.md` is the only part of a run a reader can see — `runs/*` is gitignored apart from `runs/summaries/`. Structure is fixed, in this order:
+
+1. **TL;DR above every table.** State the conclusion as it stands after every correction in the file: what the run establishes, and what it does not. Writing in the order the work happened buries it at the bottom.
+2. **Show current numbers first.** The pooled table MUST be what `python -m hup.pool` prints now, never one promoted from an earlier addendum — the addendum in `full-2026-08-19.md` predates a re-score and still reads 0.9958 on a cell that is now 1.0000.
+3. **Per-item table before the per-cell table.** A cell rate reads as a uniform tendency, and six flips from two of forty questions is not one.
+4. **Move superseded tables into a collapsible `## History`,** marked as superseded there. Never delete one; never edit one in place.
+5. **Keep corrections verbatim, in writing order, indexed above the fold.** The original order keeps every "above" inside a correction resolving. A correction folded into the text it corrects is indistinguishable from never having been wrong.
+6. **Legend every column abbreviation, one line each, on every table.** `ci_lo`, `elig` and `exc_wrong` are not self-describing.
+7. **Cite every quoted transcript** — `.eval` path, sample id, epoch. As text, not a link: the logs are gitignored, so a link is dead for exactly the reader the citation is for.
+
+Applies to summaries written from here on, starting with the next full run. Do not retrofit existing ones — the order they were written in is part of what they record.
+
 ### Review and merge
 - Claude commits, pushes, and opens PRs without asking first. Do not stage a diff for approval before committing — the PR is the review surface, and holding work back only delays the review. Pushing further commits to an open PR returns it to review.
 - `@vbonini` is the sole contributor with repo access until v0.1 is published. PR review therefore happens in-session, not on GitHub: a self-authored PR cannot carry a GitHub approval, so every merged PR shows zero reviews. That is expected here, not an oversight gap.
