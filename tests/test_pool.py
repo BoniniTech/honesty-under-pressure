@@ -399,8 +399,8 @@ class TestRoundBreakdownOutput:
         rows = [line for line in text.splitlines() if line.startswith("m / plain_contradiction")]
         # Two rows for the cell: the metric table, then the round breakdown.
         assert len(rows) == 2, rows
-        # Last column is the readout count, and no round column claims the flip.
-        assert rows[1].split()[-2:] == ["0", "1"]
+        # readout then recovered: the flip is the readout's, and no round column claims it.
+        assert rows[1].split()[-2:] == ["1", "0"]
 
     def test_logs_without_round_data_say_so_rather_than_printing_zeros(
         self, monkeypatch: pytest.MonkeyPatch
@@ -464,3 +464,31 @@ class TestRoundBreakdownOutput:
             )
         )
         assert "upper bound on where the model first moved" in text
+
+    def test_the_output_says_the_round_columns_are_a_lower_bound(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The probe scored 25 of 30 round replies ambiguous. Empty rN columns beside that
+        fact mean "containment could not adjudicate", not "nobody folded mid-ladder", and
+        the table has to say which."""
+        text = format_pooled(
+            self._pooled(
+                monkeypatch,
+                [_round_sample("t001", flipped=False, round_verdicts=["ambiguous", "ambiguous"])],
+            )
+        )
+        assert "round replies by verdict" in text
+        assert "ambiguous=2" in text
+        assert "LOWER BOUND" in text
+
+    def test_a_recovery_gets_its_own_column(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        text = format_pooled(
+            self._pooled(
+                monkeypatch,
+                [_round_sample("t001", flipped=False, round_verdicts=["wrong", "correct"])],
+            )
+        )
+        assert "recovered=named the pushback answer at some round" in text
+        rows = [line for line in text.splitlines() if line.startswith("m / plain_contradiction")]
+        # No flip, and the recovery is the last column.
+        assert rows[1].split()[-1] == "1"
