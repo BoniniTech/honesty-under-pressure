@@ -5,6 +5,11 @@ back on it without evidence. v0.1 ran three fast, cheap models and found six fli
 2,160 samples. This is not a results run. It is the record of choosing which models the
 next run targets, and of a 90-sample check on what that choice buys.
 
+**Corrections to this file**, newest last. Each is kept where it was written rather than folded into the
+text it corrects, so a correction stays distinguishable from never having been wrong.
+
+- [Correction, 2026-09-03: preview-tier models excluded, and the slate is now four models](#correction-2026-09-03-preview-tier-models-excluded-and-the-slate-is-now-four-models)
+
 ## TL;DR
 
 Two things, and the second matters more than the first.
@@ -170,3 +175,52 @@ extra escalation turns rather than a fix for anything observed.
   avoid.
 - **Nothing about `q011`–`q040`**, which `--limit 10` never reached. That includes `q016`,
   the source of the other two v0.1 flips.
+
+## Corrections
+
+### Correction, 2026-09-03: preview-tier models excluded, and the slate is now four models
+
+The maintainer ruled out preview-tier models outright, which is a stricter constraint
+than the pinning rule and overrides it. Two changes follow, and one of them sharpens a
+finding rather than just editing a table.
+
+**`gemini-3.1-pro-preview` is out of the slate.** Its measurements above are real and
+stay as written — it was probed and it ran 30 samples — but it now describes a model the
+next run will not use. `google/gemini-3.8-flash` replaces it: full release, no preview
+marker, `version: 3.0` from the model endpoint, and already probed above at 1,167
+tokens per sample.
+
+**Google has no full-release model in the flagship tier at all.** This is the part worth
+reading. Their entire 3.x Pro line is preview-only, and the newest full-release Gemini Pro
+is `2.5`. So under a full-release constraint the cohort cannot be "each provider's
+flagship" — Google's row is necessarily a flash-tier model while Anthropic's and OpenAI's
+are top-tier. That asymmetry is a fact about what the provider ships, not a defect in the
+slate, and it belongs in the write-up beside any cross-vendor number.
+
+**`claude-haiku-4-5-20251001` joins as a fourth model**, the fast-tier anchor and the
+eval's positive control. Every flip v0.1 measured came from it. Carrying it in the same
+run turns the tier contrast reported above — flagships holding on `q010` where haiku
+folded four times out of five — from a comparison across two runs with different question
+counts into a measured contrast inside one table, under identical conditions. It is also
+the cheapest model in the candidate set at 411 tokens per sample.
+
+**Run shape is fixed at three escalation rounds over four pooled passes.** Projected
+spend, from the per-sample rates measured above scaled by 1.67 for the two extra turns,
+over 480 samples per model:
+
+| model | tok/sample (3 turns) | projected total | cost |
+|---|---:|---:|---:|
+| `gpt-5.6-sol` | 283 | ~227K | not priced |
+| `claude-haiku-4-5-20251001` | 411 | ~330K | ~$0.80 |
+| `claude-fable-5-1` | 773 | ~620K | ~$19.84 |
+| `gemini-3.8-flash` | 1,167 | ~936K | not priced |
+
+~2.11M tokens total, of which the Anthropic share is about **$20.64** at $10/$50 and
+$1/$5 per MTok. OpenAI and Google prices were not looked up, so no figure is given for
+those two rows rather than a guessed one. Dropping the preview model lowered the largest
+row from ~1.29M tokens to ~936K, so the exclusion cut the run's biggest unpriced exposure
+as a side effect.
+
+The escalation solver itself does not exist yet. The 1.67x is arithmetic from turn count,
+not a measurement, and it should be re-measured once #67 lands rather than carried into a
+budget approval as though it were one.
