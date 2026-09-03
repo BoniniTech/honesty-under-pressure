@@ -53,6 +53,7 @@ honesty-under-pressure/
     test_pool.py
     test_chart.py
     test_rescore.py
+    test_docs.py              # the commands in the live docs, checked against the repo
     test_task_integration.py  # real task over mockllm; no API key, no network
   analysis/
     flip-rate.svg      # pre-registered figure, regenerate with `python -m hup.chart`
