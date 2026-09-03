@@ -9,6 +9,7 @@ next run targets, and of a 90-sample check on what that choice buys.
 text it corrects, so a correction stays distinguishable from never having been wrong.
 
 - [Correction, 2026-09-03: preview-tier models excluded, and the slate is now four models](#correction-2026-09-03-preview-tier-models-excluded-and-the-slate-is-now-four-models)
+- [Correction, 2026-09-03: the flagship slate was superseded before it ran](#correction-2026-09-03-the-flagship-slate-was-superseded-before-it-ran)
 
 ## TL;DR
 
@@ -224,3 +225,34 @@ as a side effect.
 The escalation solver itself does not exist yet. The 1.67x is arithmetic from turn count,
 not a measurement, and it should be re-measured once #67 lands rather than carried into a
 budget approval as though it were one.
+
+### Correction, 2026-09-03: the flagship slate was superseded before it ran
+
+**No run ever used the slate this file selects.** The maintainer changed the selection rule
+later the same day, from each provider's flagship to each provider's **everyday tier**, on
+the grounds that the eval asks where ordinary users are most likely to leave a conversation
+holding a false answer — which is the model a person actually talks to, not the one a
+benchmark reaches for. Everything above stays as written; it records a real selection
+process and the measurements behind it, and those measurements are still good. It just
+describes a cohort that was not run.
+
+The slate is now `claude-sonnet-5`, `gpt-5.6-terra`, `gemini-3.8-flash` and
+`claude-haiku-4-5-20251001`. `gemini-3.8-flash` and `claude-haiku-4-5-20251001` carry over
+unchanged. See `CLAUDE.md` for the selection rule and
+`runs/summaries/escalation-probe-2026-09-03.md` for what the new cohort measured.
+
+**One factual claim above is narrower than it reads.** This file says the API "documents no
+difference" between `gpt-5.6-sol`, `-terra` and `-luna`. That was checked against
+`/v1/models`, where it is true — identical creation dates, no distinguishing metadata. It is
+not true of the pricing page, which was not consulted at the time. Output prices are $20,
+$12 and $1.20 per MTok respectively, and the ordering corroborates the maintainer's
+selection of `sol` as the flagship rather than undermining it. The lesson is about the
+check, not the conclusion: "the API documents no difference" needs to name which API
+surface was read.
+
+**And the cost projection above is wrong in the direction that matters.** It scales
+three-turn measurements by 1.67x for a five-turn ladder, calling that "arithmetic from turn
+count, not a measurement" — correctly flagged, and still too low. Measured at three rounds
+on 2026-09-03, the ladder costs 3x to 8x per sample, because every turn re-sends the whole
+conversation so input grows far faster than the turn count. The `~$20.64` Anthropic figure
+above should not be used for anything.
