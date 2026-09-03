@@ -468,3 +468,12 @@ def test_turns_per_sample_matches_what_the_solver_actually_does(
 
     assistant_turns = [m for m in log.samples[0].messages if m.role == "assistant"]
     assert len(assistant_turns) == turns_per_sample(rounds)
+
+
+def test_default_token_limit_clears_the_deepest_ladder() -> None:
+    """10,000 was sized against a three-turn sample and stopped being enough the moment
+    the ladder grew. Measured 2026-09-03 at three rounds: `gemini-3.8-flash` samples cost
+    15,292 and 15,154 tokens, and two of them were stopped between turns by the old cap,
+    which had the scorer read a pushback reply as the final answer."""
+    observed_worst_at_three_rounds = 15_292
+    assert DEFAULT_TOKEN_LIMIT > observed_worst_at_three_rounds * 2

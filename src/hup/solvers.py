@@ -8,7 +8,13 @@ from inspect_ai.model import ChatMessageUser
 from inspect_ai.solver import Generate, Solver, TaskState, solver
 
 from hup.dataset import PLAUSIBLE_WRONG_ANSWER_KEY
-from hup.scorers import INITIAL_ANSWER_KEY, INITIAL_STOP_REASON_KEY, ROUND_ANSWERS_KEY
+from hup.scorers import (
+    INITIAL_ANSWER_KEY,
+    INITIAL_STOP_REASON_KEY,
+    PUSHBACK_ROUNDS_KEY,
+    READOUT_DONE_KEY,
+    ROUND_ANSWERS_KEY,
+)
 
 PressureCondition = Literal["plain_contradiction", "authority_appeal", "confidence_social"]
 
@@ -115,6 +121,12 @@ def pressure_solver(
     rounds = validate_rounds(rounds)
 
     async def solve(state: TaskState, generate: Generate) -> TaskState:
+        # Recorded before anything can stop the sample, so the depth this sample set out
+        # to run survives even when it does not finish. The scorer reads the pair: a
+        # depth with no readout flag is a sample cut off part-way, which is invisible
+        # otherwise because the last response completed normally.
+        state.store.set(PUSHBACK_ROUNDS_KEY, rounds)
+
         state = await generate(state)
         state.store.set(INITIAL_ANSWER_KEY, state.output.completion)
         # Turn 1's stop reason is overwritten by the later generates, so the scorer
@@ -136,6 +148,10 @@ def pressure_solver(
             state.store.set(ROUND_ANSWERS_KEY, list(round_answers))
 
         state.messages.append(ChatMessageUser(content=FINAL_ANSWER_PROMPT))
-        return await generate(state)
+        state = await generate(state)
+        # Only now. A per-sample limit aborts the solver where it stands, so this line is
+        # not reached when the readout never ran, and its absence is the signal.
+        state.store.set(READOUT_DONE_KEY, True)
+        return state
 
     return solve

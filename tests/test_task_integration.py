@@ -28,7 +28,7 @@ from inspect_ai.log import EvalSample
 from inspect_ai.model import ChatMessage, ModelOutput
 from inspect_ai.scorer import NOANSWER, Score
 
-from hup.scorers import INITIAL_STOP_REASON_KEY
+from hup.scorers import INITIAL_STOP_REASON_KEY, PUSHBACK_ROUNDS_KEY, READOUT_DONE_KEY
 from hup.task import authority_appeal, confidence_social, plain_contradiction
 
 _FIXTURE = (
@@ -128,6 +128,8 @@ def test_task_scores_a_hold_and_a_flip_end_to_end(fixture_dataset: Path, tmp_pat
         "round_verdicts": ["correct"],
         "flip_round": None,
         "round_truncated": False,
+        "rounds_intended": 1,
+        "unfinished": False,
     }
 
     flipped = _only_score(by_id["t002"])
@@ -145,6 +147,8 @@ def test_task_scores_a_hold_and_a_flip_end_to_end(fixture_dataset: Path, tmp_pat
         "round_verdicts": ["neither"],
         "flip_round": None,
         "round_truncated": False,
+        "rounds_intended": 1,
+        "unfinished": False,
     }
     # Score.answer is state.output.completion, so this pins the turn-3 read.
     assert flipped.answer == "Sydney"
@@ -164,6 +168,8 @@ def test_task_scores_a_hold_and_a_flip_end_to_end(fixture_dataset: Path, tmp_pat
         "round_verdicts": ["neither"],
         "flip_round": None,
         "round_truncated": False,
+        "rounds_intended": 1,
+        "unfinished": False,
     }
 
     reported = {name: m.value for s in log.results.scores for name, m in s.metrics.items()}
@@ -411,3 +417,25 @@ def test_a_task_refuses_a_depth_the_ladders_cannot_supply(fixture_dataset: Path)
     deepest rung instead would report an escalation depth the run never applied."""
     with pytest.raises(ValueError, match="rounds must be at most"):
         plain_contradiction(dataset_path=fixture_dataset, rounds=99)
+
+
+@pytest.mark.integration
+def test_the_solver_records_the_depth_and_the_readout(
+    fixture_dataset: Path, tmp_path: Path
+) -> None:
+    """The pair that detects a sample stopped part-way. A per-sample limit aborts the
+    solver between turns, leaving the readout prompt appended with no answer generated
+    and `state.output` holding a pushback reply — which containment happily scores. Every
+    stop reason still reads `stop`, so `truncated` sees nothing.
+
+    mockllm reports no token usage, so the limit itself cannot be tripped here (see
+    tests/test_budget.py). What this pins is the store round-trip the detection rests on:
+    the depth written before the ladder, the flag written only after the readout."""
+    by_id = _escalated(fixture_dataset, tmp_path / "logs")
+
+    for sample in by_id.values():
+        assert sample.store[PUSHBACK_ROUNDS_KEY] == 3
+        assert sample.store[READOUT_DONE_KEY] is True
+        score = _only_score(sample)
+        assert score.metadata["rounds_intended"] == 3
+        assert score.metadata["unfinished"] is False

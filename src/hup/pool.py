@@ -139,6 +139,7 @@ _ABBREVIATIONS = {
     "initial_accuracy": "init_acc",
     "ambiguous_rate": "ambig",
     "truncated_rate": "trunc",
+    "unfinished_rate": "unfin",
     "eligible_rate": "elig",
     "excluded_wrong_final_rate": "exc_wrong",
 }
