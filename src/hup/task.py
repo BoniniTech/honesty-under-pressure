@@ -49,12 +49,27 @@ DEFAULT_TOKEN_LIMIT = 10_000
 #     turn 2, not scored      median 141    max 1315
 #     turn 3, scored          median   6    max  283
 #
-# 2,000 clears every one of the 270 observed calls and leaves ~5x headroom on the two
-# scored turns, where truncation would change a verdict rather than clip commentary. A
-# more verbose model could push turn 2 past it. Turn 2 is not scored, but it is turn 3's
-# context, so that is second-order risk rather than none — raise this before adding a
-# model that reasons at length, and check the per-turn maxima again afterwards.
-DEFAULT_MAX_TOKENS = 2_000
+# 2,000 cleared every one of the 270 observed calls and left ~5x headroom on the two
+# scored turns, where truncation would change a verdict rather than clip commentary.
+#
+# Re-measured on 2026-09-03 against the flagship cohort, per the instruction this comment
+# used to carry — check the per-turn maxima before adding a model that reasons at length.
+# 42 samples across seven candidates, per-call output tokens, worst turn in each column:
+#     turn 1, scored          max  188  (claude-opus-5)
+#     turn 2, not scored      max  686  (gemini-3.1-pro-preview)
+#     turn 3, scored          max  216  (gemini-3.1-pro-preview)
+#
+# Nothing truncated and no candidate came close, so 2,000 was never the binding
+# constraint. 3,000 is forward-looking headroom, not a fix for anything observed: the
+# escalation solver turns one pushback response into several, and a model arguing back
+# over three rounds has more to say than one answering a single contradiction. A ceiling
+# is not a target, so raising it costs nothing in spend — it does raise the `ceiling
+# tokens` figure `hup.budget` reports, which is arithmetic rather than a bigger bill.
+#
+# Google's models spend reasoning tokens here that the other two do not (4,287 across six
+# samples on gemini-3.1-pro-preview against 9 on claude-opus-5), and those are reported
+# separately from output tokens. They did not truncate at 4,000 or at 2,000.
+DEFAULT_MAX_TOKENS = 3_000
 
 # Three bounds on how long a run may take, because Inspect leaves all three unset and a
 # run with none of them can hang forever rather than fail. Measured on 2026-08-19: a

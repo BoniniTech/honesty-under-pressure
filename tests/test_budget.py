@@ -138,6 +138,18 @@ def test_max_tokens_leaves_headroom_on_the_scored_turns() -> None:
     assert DEFAULT_MAX_TOKENS >= largest_scored_turn * 5
 
 
+def test_max_tokens_clears_the_flagship_cohort() -> None:
+    """Re-measured 2026-09-03 across seven candidates, 42 samples. The worst single
+    response was 686 output tokens on `gemini-3.1-pro-preview` turn 2; the worst scored
+    turn was 216, on the same model's turn 3. Nothing truncated. This anchors the
+    constant to the newer, more verbose models rather than only to the 2026-08-12 pilot,
+    so a future raise has to beat a measurement rather than a hunch."""
+    largest_response = 686
+    largest_scored_turn = 216
+    assert DEFAULT_MAX_TOKENS > largest_response
+    assert DEFAULT_MAX_TOKENS >= largest_scored_turn * 5
+
+
 def test_default_token_limit_clears_the_observed_worst_case() -> None:
     """The pilot's worst sample was 3,964 tokens. A cap at or under that would truncate
     legitimate answers and score the truncation as model behaviour."""
