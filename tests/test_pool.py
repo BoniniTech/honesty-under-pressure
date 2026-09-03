@@ -266,3 +266,201 @@ class TestMain:
             runpy.run_module("hup.pool", run_name="__main__")
         assert exit_info.value.code == 0
         assert "mockllm/model" in capsys.readouterr().out
+
+
+def _round_sample(
+    sample_id: str,
+    *,
+    flipped: bool,
+    round_verdicts: list[str],
+    flip_round: int | None = None,
+    round_truncated: bool = False,
+) -> SimpleNamespace:
+    """A sample as the escalation scorer writes one, for the stand-in log path."""
+    return _fake_sample(
+        sample_id,
+        {
+            "flip_scorer": SimpleNamespace(
+                value="I" if flipped else "C",
+                metadata={
+                    "initial_correct": True,
+                    "final_correct": not flipped,
+                    "flipped": flipped,
+                    "ambiguous": False,
+                    "truncated": False,
+                    "initial_verdict": "correct",
+                    "final_verdict": "wrong" if flipped else "correct",
+                    "round_verdicts": round_verdicts,
+                    "flip_round": flip_round,
+                    "round_truncated": round_truncated,
+                },
+            )
+        },
+    )
+
+
+def _load_fake(monkeypatch: pytest.MonkeyPatch, logs: list) -> dict:
+    """Run load_cells over stand-in logs, one per path handed in."""
+    queue = list(logs)
+    monkeypatch.setattr(pool_module, "read_eval_log", lambda _path: queue.pop(0))
+    return load_cells([Path(f"pass{index}.eval") for index in range(len(logs))])
+
+
+class TestEscalationDepth:
+    def test_passes_at_the_same_depth_pool(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        logs = [
+            _fake_log(samples=[_round_sample("t001", flipped=False, round_verdicts=["correct"])]),
+            _fake_log(samples=[_round_sample("t002", flipped=False, round_verdicts=["correct"])]),
+        ]
+        assert len(_load_fake(monkeypatch, logs)) == 1
+
+    def test_a_cell_mixing_depths_is_refused(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """One round and three rounds are different experiments. Pooled they produce the
+        same cells, sample counts and columns as either one alone, so nothing in the
+        table would show that the flip rate describes neither."""
+        logs = [
+            _fake_log(samples=[_round_sample("t001", flipped=False, round_verdicts=["correct"])]),
+            _fake_log(
+                samples=[
+                    _round_sample(
+                        "t002", flipped=False, round_verdicts=["correct", "correct", "correct"]
+                    )
+                ]
+            ),
+        ]
+        with pytest.raises(PoolingError, match="different escalation depths"):
+            _load_fake(monkeypatch, logs)
+
+    def test_the_refusal_names_the_cell(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A twelve-cell run needs to say which pair of passes disagreed."""
+        logs = [
+            _fake_log(
+                model="anthropic/claude-haiku-4-5-20251001",
+                samples=[_round_sample("t001", flipped=False, round_verdicts=["correct"])],
+            ),
+            _fake_log(
+                model="anthropic/claude-haiku-4-5-20251001",
+                samples=[
+                    _round_sample("t002", flipped=False, round_verdicts=["correct", "correct"])
+                ],
+            ),
+        ]
+        with pytest.raises(PoolingError, match="claude-haiku-4-5-20251001"):
+            _load_fake(monkeypatch, logs)
+
+    def test_pre_escalation_passes_still_pool(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """`python -m hup.pool runs/full-2026-08-19/pass*/*.eval` is in the README, and
+        those logs carry no round fields at all. Consistently unrecorded is consistent,
+        so the depth check has to let them through rather than reading absent as zero."""
+        logs = [_fake_log(samples=[_fake_sample("t001")]) for _ in range(2)]
+        pooled = _load_fake(monkeypatch, logs)
+        assert len(pooled) == 1
+        assert next(iter(pooled.values())).passes == 2
+
+
+class TestRoundBreakdownOutput:
+    @staticmethod
+    def _pooled(monkeypatch: pytest.MonkeyPatch, samples: list) -> dict:
+        """One cell, loaded through the public path so the breakdown sees the same
+        SampleScore shape a real log produces."""
+        return _load_fake(monkeypatch, [_fake_log(samples=samples)])
+
+    def test_the_breakdown_splits_flips_by_round(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        text = format_pooled(
+            self._pooled(
+                monkeypatch,
+                [
+                    _round_sample(
+                        "t001", flipped=True, round_verdicts=["wrong", "wrong"], flip_round=1
+                    ),
+                    _round_sample(
+                        "t002", flipped=True, round_verdicts=["correct", "wrong"], flip_round=2
+                    ),
+                    _round_sample("t003", flipped=False, round_verdicts=["correct", "correct"]),
+                ],
+            )
+        )
+        assert "where the flips happened" in text
+        assert "r1" in text and "r2" in text
+        assert "readout" in text
+
+    def test_a_readout_only_flip_is_not_counted_as_a_round(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Argued through every round and then named the pushback answer when asked for
+        the answer alone. Folding under the ladder and folding at the readout are
+        different findings, so the column is separate rather than a fourth round."""
+        text = format_pooled(
+            self._pooled(
+                monkeypatch,
+                [_round_sample("t001", flipped=True, round_verdicts=["correct"], flip_round=None)],
+            )
+        )
+        rows = [line for line in text.splitlines() if line.startswith("m / plain_contradiction")]
+        # Two rows for the cell: the metric table, then the round breakdown.
+        assert len(rows) == 2, rows
+        # Last column is the readout count, and no round column claims the flip.
+        assert rows[1].split()[-2:] == ["0", "1"]
+
+    def test_logs_without_round_data_say_so_rather_than_printing_zeros(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """An empty breakdown would read as a run where no flip landed on any round,
+        which is a claim about the models rather than about what the logs recorded."""
+        text = format_pooled(self._pooled(monkeypatch, [_fake_sample("t001")]))
+        assert "flip round: not recorded" in text
+        assert "where the flips happened" not in text
+
+    def test_a_run_at_the_default_depth_records_one_round(self, two_passes: list[Path]) -> None:
+        """The default is one round, and it is recorded rather than left implicit. A v0.1
+        log and a v0.2 run at rounds=1 apply the same pressure and are still told apart,
+        because only the second says where inside the round the model moved."""
+        text = format_pooled(load_cells(two_passes))
+        assert "where the flips happened" in text
+        assert "flip round: not recorded" not in text
+
+    def test_cells_at_different_depths_warn(self) -> None:
+        """Refused inside a cell, warned about across cells: two cells at two depths are
+        each honest on their own and are not comparable with each other."""
+        shallow, deep = Cell("m", "shallow"), Cell("m", "deep")
+        pooled = {
+            shallow: PooledCell(
+                shallow,
+                pool_module._sample_scores(
+                    [_round_sample("t001", flipped=False, round_verdicts=["correct"])]
+                ),
+                1,
+                [1],
+            ),
+            deep: PooledCell(
+                deep,
+                pool_module._sample_scores(
+                    [_round_sample("t002", flipped=False, round_verdicts=["correct", "correct"])]
+                ),
+                1,
+                [1],
+            ),
+        }
+        text = format_pooled(pooled)
+        assert "different escalation depths, so their flip rates are" in text
+        # The shallower cell has no round 2, so its cell is blanked rather than zeroed.
+        assert " - " in text or "-" in text
+
+    def test_a_truncated_round_warns_that_the_round_is_an_upper_bound(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        text = format_pooled(
+            self._pooled(
+                monkeypatch,
+                [
+                    _round_sample(
+                        "t001",
+                        flipped=True,
+                        round_verdicts=["neither", "wrong"],
+                        flip_round=2,
+                        round_truncated=True,
+                    )
+                ],
+            )
+        )
+        assert "upper bound on where the model first moved" in text
