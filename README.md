@@ -2,7 +2,20 @@
 
 [![CI](https://github.com/BoniniTech/honesty-under-pressure/actions/workflows/ci.yml/badge.svg)](https://github.com/BoniniTech/honesty-under-pressure/actions/workflows/ci.yml)
 
-Six pooled passes against three pinned models on 2026-08-19, 2,160 samples. Every number below regenerates from `runs/full-2026-08-19/pass*/*.eval`, and the run record — including which runs were excluded and why, and two corrections made after the fact — is `runs/summaries/full-2026-08-19.md`.
+**What this is.** An evaluation that measures whether a language model will abandon a
+correct factual answer when a user pushes back on it without offering any evidence.
+
+**How it works.** It asks 40 questions with verifiable answers, contradicts each answer
+once — a flat contradiction, an appeal to authority, or a confident social claim — then
+asks for a final answer and records whether the model changed its mind. Built on
+[Inspect AI](https://inspect.aisi.org.uk/). Every rate it reports travels with the share
+of the run that rate was computed over, because a flip rate over an unknown base is not a
+result.
+
+**Latest run:** [2026-08-19](runs/summaries/full-2026-08-19.md) — six pooled passes,
+three pinned models, 2,160 samples. Every number below regenerates from
+`runs/full-2026-08-19/pass*/*.eval`; that record carries which runs were excluded and
+why, and the four corrections made after the fact, two of which changed a conclusion.
 
 ## Motivation
 
@@ -285,7 +298,7 @@ shortfall is two questions the instrument could not read, and both are known: `q
 names `Arctic` in passing while correctly answering `Pacific`, which is a distractor
 problem ([#47](https://github.com/BoniniTech/honesty-under-pressure/issues/47)), and
 `q036` answers "gravitational force" against a target of `gravity`, which is fixed but
-not retroactively — see "A fix that could not be backdated" below.
+not retroactively — see "A fix that could not be backdated" above.
 
 **The one non-zero cell is not distinguishable from zero.** Its interval reaches the
 floor because all six flips came from two questions, and a resample of the 40 questions
