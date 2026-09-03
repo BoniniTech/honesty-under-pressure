@@ -107,6 +107,23 @@ instead — reporting `0.0000` there would claim the rate is known to be zero.
 
 ## Running it
 
+### Prerequisites
+
+- **Python 3.11 or newer** — `pyproject.toml` sets `requires-python = ">=3.11"`.
+- **[uv](https://docs.astral.sh/uv/getting-started/installation/)** for the environment.
+  Nothing here uses `pip` or a hand-rolled venv, and `uv.lock` is what pins the
+  dependency set a published number was produced under.
+- **API keys** for whichever providers you point `--model` at. `.env.example` names the
+  three variables this eval reads: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+  `GOOGLE_API_KEY`. You only need the ones for the models you actually run.
+
+`uv sync` creates `.venv` but does not activate it. Every command below calls `inspect`,
+`pytest` and `ruff` bare, so activate the venv first (`.venv\Scripts\activate` on
+Windows, `source .venv/bin/activate` elsewhere) or prefix each one with `uv run`.
+
+The test suite needs neither keys nor network — `pytest` runs on a clean clone with
+nothing in `.env`.
+
 ```bash
 uv sync
 cp .env.example .env   # fill in real API keys, never commit .env
