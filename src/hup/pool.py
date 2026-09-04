@@ -30,7 +30,7 @@ from pathlib import Path
 from inspect_ai.log import read_eval_log
 from inspect_ai.scorer import SampleScore, Score, Value
 
-from hup.scorers import METRIC_FACTORIES
+from hup.scorers import METRIC_FACTORIES, flips_by_round, recorded_rounds
 
 
 class PoolingError(RuntimeError):
@@ -82,6 +82,11 @@ def load_cells(paths: list[Path]) -> dict[Cell, PooledCell]:
     Refuses a log that did not finish. A crashed pass contributes a partial cell, which
     would weight whichever items happened to run before the failure more heavily than
     the rest — a silent bias, and exactly the kind that survives into a published table.
+
+    Refuses a cell whose passes ran different escalation depths, for a sharper version of
+    the same reason. A one-round pass and a three-round pass produce the same cells, the
+    same sample counts and the same columns, so their mixture is invisible in the output
+    while the flip rate it produces describes neither run.
     """
     if not paths:
         raise PoolingError("no log files given")
@@ -100,6 +105,12 @@ def load_cells(paths: list[Path]) -> dict[Cell, PooledCell]:
         entry.scores.extend(scores)
         entry.passes += 1
         entry.samples_per_pass.append(len(scores))
+
+    for cell, entry in pooled.items():
+        try:
+            recorded_rounds(entry.scores)
+        except ValueError as error:
+            raise PoolingError(f"{cell}: {error}") from error
 
     return pooled
 
@@ -128,6 +139,7 @@ _ABBREVIATIONS = {
     "initial_accuracy": "init_acc",
     "ambiguous_rate": "ambig",
     "truncated_rate": "trunc",
+    "unfinished_rate": "unfin",
     "eligible_rate": "elig",
     "excluded_wrong_final_rate": "exc_wrong",
 }
@@ -136,6 +148,102 @@ _ABBREVIATIONS = {
 def _cell_value(value: Value) -> str:
     number = float(value)  # type: ignore[arg-type]
     return "nan" if math.isnan(number) else f"{number:.4f}"
+
+
+def format_round_breakdown(pooled: dict[Cell, PooledCell]) -> list[str]:
+    """Lines saying where in the escalation ladder each cell's flips happened.
+
+    Reported beneath the metric table rather than as a column in it, because it is a
+    breakdown of the flip rate rather than another rate: the round counts sum to the
+    flips the cell already reported.
+
+    A cell of logs that predate the escalation solver says so in words. Printing an empty
+    breakdown there would read as a run where no flip landed on any round, which is a
+    claim about the models rather than about what the logs recorded.
+    """
+    breakdowns = {cell: flips_by_round(entry.scores) for cell, entry in pooled.items()}
+    depths = {breakdown.rounds for breakdown in breakdowns.values()}
+
+    if depths == {None}:
+        return [
+            "",
+            "flip round: not recorded in these logs. They predate the escalation solver,",
+            "which applied one round of pushback without recording where inside it a model",
+            "moved. Re-scoring cannot backfill it; only a fresh run can.",
+        ]
+
+    width = max(len(str(cell)) for cell in pooled)
+    columns = max((breakdown.rounds or 0) for breakdown in breakdowns.values())
+    header = (
+        f"{'cell':<{width}}  {'depth':>5} {'elig':>5} {'flips':>5}  "
+        + " ".join(f"{'r' + str(number):>5}" for number in range(1, columns + 1))
+        + f" {'readout':>7} {'recovered':>9}"
+    )
+    lines = ["", "where the flips happened, over the eligible denominator:", "", header]
+    lines.append("-" * len(header))
+
+    for cell in sorted(pooled, key=str):
+        breakdown = breakdowns[cell]
+        depth = "none" if breakdown.rounds is None else str(breakdown.rounds)
+        rounds = " ".join(
+            f"{breakdown.by_round.get(number, 0):>5}"
+            if number <= (breakdown.rounds or 0)
+            else f"{'-':>5}"
+            for number in range(1, columns + 1)
+        )
+        lines.append(
+            f"{str(cell):<{width}}  {depth:>5} {breakdown.eligible:>5} "
+            f"{breakdown.flips:>5}  {rounds} {breakdown.at_readout:>7} "
+            f"{breakdown.recovered:>9}"
+        )
+
+    lines += [
+        "",
+        "depth=pushback rounds applied  rN=first named the pushback answer at round N",
+        "readout=argued through every round, then named it when asked for the answer alone",
+        "recovered=named the pushback answer at some round, back on target by the readout",
+    ]
+
+    # The rN columns are a lower bound, not a census, and this is the number that says by
+    # how much. A round reply that argues its position names both candidates ("it's 24,
+    # not 22"), which containment cannot tell from the capitulation that names both, so it
+    # scores `ambiguous` and sets no round. The scored turns escape this because the
+    # readout asks for the answer alone; the rounds carry no such instruction. Without
+    # this line, empty rN columns read as "no model ever folded mid-ladder".
+    verdicts: dict[str, int] = {}
+    for breakdown in breakdowns.values():
+        for verdict, count in breakdown.verdict_counts.items():
+            verdicts[verdict] = verdicts.get(verdict, 0) + count
+    total_rounds = sum(verdicts.values())
+    if total_rounds:
+        adjudicable = verdicts.get("correct", 0) + verdicts.get("wrong", 0)
+        lines += [
+            "",
+            "round replies by verdict, over every round of every eligible sample:",
+            "  " + "  ".join(f"{verdict}={count}" for verdict, count in sorted(verdicts.items())),
+            f"  {adjudicable} of {total_rounds} named exactly one candidate, so the rN columns",
+            "  above are a LOWER BOUND on where models first gave in. A reply arguing its",
+            '  position names both candidates ("it\'s 24, not 22") and scores ambiguous; the',
+            "  readout turn avoids that by asking for the answer alone, the rounds do not.",
+        ]
+
+    if len(depths) > 1:
+        lines += [
+            "",
+            "WARNING: these cells ran different escalation depths, so their flip rates are",
+            "not comparable with each other. Pool one depth at a time before publishing.",
+        ]
+
+    truncated = {cell: b.truncated_rounds for cell, b in breakdowns.items() if b.truncated_rounds}
+    if truncated:
+        lines += [
+            "",
+            "WARNING: a pushback round was cut off in these cells, so the round it names is",
+            "an upper bound on where the model first moved, not the round itself.",
+        ]
+        lines += [f"  {cell}: {count}" for cell, count in sorted(truncated.items(), key=str)]
+
+    return lines
 
 
 def format_pooled(pooled: dict[Cell, PooledCell]) -> str:
@@ -169,6 +277,7 @@ def format_pooled(pooled: dict[Cell, PooledCell]) -> str:
 
     lines.append("")
     lines.append("  ".join(f"{_ABBREVIATIONS[name]}={name}" for name in names))
+    lines += format_round_breakdown(pooled)
 
     uneven = uneven_cells(pooled)
     if uneven:

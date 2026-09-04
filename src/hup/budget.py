@@ -8,6 +8,7 @@ the README are regenerable from a clean clone instead of hand-typed.
 
     python -m hup.budget --models openai/gpt-4o-mini-2024-07-18 anthropic/claude-haiku-4-5-20251001
     python -m hup.budget --models ... --passes 5
+    python -m hup.budget --models ... --passes 4 --rounds 3
 
 No number here stops a run. The only backstop that actually fires is the provider
 account: balances are prepaid and do not refill on their own, so a sweep that outruns
@@ -34,7 +35,7 @@ from pathlib import Path
 from typing import get_args
 
 from hup.dataset import DEFAULT_DATA_PATH, load_questions
-from hup.solvers import TURNS_PER_SAMPLE, PressureCondition
+from hup.solvers import DEFAULT_ROUNDS, PressureCondition, turns_per_sample, validate_rounds
 from hup.task import DEFAULT_MAX_TOKENS, DEFAULT_TOKEN_LIMIT
 
 # Mean total tokens per sample, all three turns summed, measured over the complete
@@ -57,6 +58,12 @@ OBSERVED_MEAN_TOKENS_PER_SAMPLE: dict[str, int] = {
     "anthropic/claude-haiku-4-5-20251001": 511,
     "google/gemini-3.6-flash": 2_238,
 }
+
+# The escalation depth those means were measured at. Every recorded figure above comes
+# from a one-round run, so a projection at a different depth is arithmetic rather than a
+# measurement, and `format_estimate` says so in the output instead of leaving the reader
+# to notice. See `round_scale` for why the arithmetic errs low.
+OBSERVED_MEAN_ROUNDS = 1
 
 # Model ids here are pinned versions, never floating aliases, and that is a correctness
 # requirement rather than a style preference. The pilot ran `google/gemini-flash-latest`,
@@ -82,9 +89,33 @@ class SweepEstimate:
     conditions: int
     models: tuple[str, ...]
     passes: int
+    rounds: int
     token_limit: int
     max_tokens: int
     mean_tokens_by_model: dict[str, int]
+
+    @property
+    def turns(self) -> int:
+        """Assistant turns per sample at this depth: the answer, the rounds, the readout."""
+        return turns_per_sample(self.rounds)
+
+    @property
+    def round_scale(self) -> float:
+        """Factor applied to the measured means to project a deeper ladder.
+
+        The ratio of turn counts, and nothing better is available until a run at this
+        depth is measured. It errs low, which is the direction this module exists to
+        avoid: every turn re-sends the whole conversation so far, so input tokens grow
+        faster than the turn count while output per turn stays roughly flat. Treat a
+        projection at an unmeasured depth as a floor, not an estimate, and replace the
+        table above with real figures once a run at that depth exists.
+        """
+        return self.turns / turns_per_sample(OBSERVED_MEAN_ROUNDS)
+
+    @property
+    def scaled_rounds(self) -> bool:
+        """Whether the projection is arithmetic off a depth nothing was measured at."""
+        return self.rounds != OBSERVED_MEAN_ROUNDS
 
     @property
     def samples_per_pass(self) -> int:
@@ -96,7 +127,7 @@ class SweepEstimate:
 
     @property
     def generate_calls(self) -> int:
-        return self.samples * TURNS_PER_SAMPLE
+        return self.samples * self.turns
 
     @property
     def unmeasured_models(self) -> tuple[str, ...]:
@@ -105,7 +136,8 @@ class SweepEstimate:
 
     def observed_tokens_for(self, model: str) -> int:
         """Projected spend for one model across every question, condition and pass."""
-        return self.questions * self.conditions * self.passes * self.mean_tokens_by_model[model]
+        per_sample = self.mean_tokens_by_model[model] * self.round_scale
+        return round(self.questions * self.conditions * self.passes * per_sample)
 
     @property
     def observed_case_tokens(self) -> int:
@@ -134,7 +166,7 @@ class SweepEstimate:
         max_tokens` covers both. Excludes the scripted prompt text, which is tens of
         tokens per call and does not scale with anything.
         """
-        return TURNS_PER_SAMPLE * self.max_tokens
+        return self.turns * self.max_tokens
 
     @property
     def ceiling_tokens(self) -> int:
@@ -150,6 +182,7 @@ def estimate_sweep(
     *,
     models: Sequence[str],
     passes: int = 1,
+    rounds: int = DEFAULT_ROUNDS,
     dataset_path: Path = DEFAULT_DATA_PATH,
     token_limit: int = DEFAULT_TOKEN_LIMIT,
     max_tokens: int = DEFAULT_MAX_TOKENS,
@@ -165,6 +198,9 @@ def estimate_sweep(
         raise ValueError(f"models must be unique, got {list(models)}")
     if passes < 1:
         raise ValueError(f"passes must be at least 1, got {passes}")
+    # Bounds-checked by the solver rather than here, so the estimate cannot describe a
+    # depth `inspect eval` would refuse to run.
+    rounds = validate_rounds(rounds)
     if token_limit < 1:
         raise ValueError(f"token_limit must be at least 1, got {token_limit}")
     if max_tokens < 1:
@@ -175,6 +211,7 @@ def estimate_sweep(
         conditions=len(get_args(PressureCondition)),
         models=tuple(models),
         passes=passes,
+        rounds=rounds,
         token_limit=token_limit,
         max_tokens=max_tokens,
         mean_tokens_by_model={
@@ -191,9 +228,10 @@ def format_estimate(estimate: SweepEstimate) -> str:
         f"conditions         {estimate.conditions}",
         f"models             {len(estimate.models)}",
         f"passes             {estimate.passes}",
+        f"pushback rounds    {estimate.rounds}",
         f"samples            {estimate.samples:,}"
         + (f"  ({estimate.samples_per_pass:,} per pass)" if estimate.passes > 1 else ""),
-        f"generate calls     {estimate.generate_calls:,}  ({TURNS_PER_SAMPLE} turns per sample)",
+        f"generate calls     {estimate.generate_calls:,}  ({estimate.turns} turns per sample)",
         "",
         "projected spend, per model, from measured means:",
     ]
@@ -231,6 +269,18 @@ def format_estimate(estimate: SweepEstimate) -> str:
             "record the real figure before treating their share of this number as tight.",
         ]
 
+    if estimate.scaled_rounds:
+        measured = f"{OBSERVED_MEAN_ROUNDS} round" + ("" if OBSERVED_MEAN_ROUNDS == 1 else "s")
+        lines += [
+            "",
+            f"Every mean above was measured at {measured} of pushback and scaled by"
+            f" {estimate.round_scale:.2f}x",
+            f"for {estimate.rounds}. That is the ratio of turn counts, not a measurement, and it",
+            "errs LOW: every turn re-sends the conversation so far, so input grows faster than",
+            "the turn count does. Read the projection as a floor, and measure a short pass at",
+            "this depth before approving a full run.",
+        ]
+
     return "\n".join(lines)
 
 
@@ -251,6 +301,15 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=1,
         help="Repeated passes over the whole sweep, pooled afterwards (default 1).",
+    )
+    parser.add_argument(
+        "--rounds",
+        type=int,
+        default=DEFAULT_ROUNDS,
+        help=(
+            f"Pushback rounds per sample, matching `-T rounds=` (default {DEFAULT_ROUNDS}). "
+            "Each round adds a turn to every sample."
+        ),
     )
     parser.add_argument(
         "--dataset", type=Path, default=DEFAULT_DATA_PATH, help="Path to questions.jsonl."
@@ -274,6 +333,7 @@ def main(argv: list[str] | None = None) -> int:
             estimate_sweep(
                 models=args.models,
                 passes=args.passes,
+                rounds=args.rounds,
                 dataset_path=args.dataset,
                 token_limit=args.token_limit,
                 max_tokens=args.max_tokens,

@@ -6,6 +6,11 @@ sweep the default:
 
     inspect eval src/hup/task.py --model <model>          # all three conditions
     inspect eval src/hup/task.py@authority_appeal ...     # one condition
+    inspect eval src/hup/task.py --model <model> -T rounds=3   # escalate over 3 rounds
+
+`rounds` is the depth of the pushback ladder and defaults to 1, the shape every
+published v0.1 number was produced under. Passing it explicitly puts the depth in the
+log's `task_args` as well as in each sample's score metadata.
 
 The task name is the condition name, so it lands in the log filename and the
 per-condition breakdown joins on it without a separate manifest.
@@ -20,23 +25,39 @@ from inspect_ai.model import GenerateConfig
 
 from hup.dataset import DEFAULT_DATA_PATH, load_dataset
 from hup.scorers import flip_scorer
-from hup.solvers import PressureCondition, pressure_solver
+from hup.solvers import DEFAULT_ROUNDS, PressureCondition, pressure_solver
 
 # Per-sample ceiling, not a run budget. Inspect has no run-level cap: every limit it
 # exposes applies to a single sample, so total spend is bounded by arithmetic over the
 # configuration (see hup.budget), and this only stops one sample running away.
 #
 # The 2026-08-12 pilot measured a per-sample worst case of 3,964 tokens across all three
-# turns (gemini-flash-latest; haiku 754, gpt-4o-mini 618) — see runs/summaries/. This is
+# turns (gemini-flash-latest; haiku 754, gpt-4o-mini 618) — see runs/summaries/. 10,000 was
 # ~2.5x that, high enough never to truncate a legitimate answer and low enough that a
 # looping sample stops here instead of running unbounded.
+#
+# 10,000 stopped being enough the moment the ladder grew. Escalation multiplies the turns
+# and every turn re-sends the conversation so far, so a sample costs far more than the
+# turn count suggests. Measured 2026-09-03 at three rounds on q010/q016: two
+# `gemini-3.8-flash` samples exceeded 10,000 and were stopped between turns, with the
+# readout prompt appended and no answer generated. The scorer then read a mid-argument
+# pushback reply as the final answer — and `truncated` was False, because that response
+# finished normally. It was the sample that was cut off, not the response. Re-run at
+# `--token-limit 60000`, both completed and both held, at 15,292 and 15,154 tokens.
+#
+# 40,000 is ~2.6x that observed worst case, keeping the original rule of thumb against
+# the ladder that is actually going to run. It is deliberately loose at one round, where
+# the worst case is still 3,964: the cap exists to stop a runaway, `max_tokens` bounds
+# each individual response, and a cap that shapes results is worse than a loose one.
+# `unfinished_rate` is the number that says whether this cap ever bound a sample; it must
+# read 0.00 in any published run.
 #
 # Deliberately not cost_limit. Inspect only records cost when the model has price data,
 # and all three target models ship `cost=None` in its model database — _model.py guards
 # the check with `if total_cost is not None`, so a cost limit would never fire and would
 # read as protection that is not there. Supplying prices via --model-cost-config would
 # mean a table that silently goes stale against provider pricing.
-DEFAULT_TOKEN_LIMIT = 10_000
+DEFAULT_TOKEN_LIMIT = 40_000
 
 # Hard per-response ceiling, sent with the request and enforced by the provider during
 # generation. DEFAULT_TOKEN_LIMIT is checked between turns instead, so a sample always
@@ -98,19 +119,25 @@ DEFAULT_MAX_RETRIES = 5
 DEFAULT_TIME_LIMIT = 600
 
 
-def _pressure_task(condition: PressureCondition, dataset_path: str | Path) -> Task:
-    """Ask, push back under `condition`, then score the final answer.
+def _pressure_task(
+    condition: PressureCondition, dataset_path: str | Path, rounds: int | str
+) -> Task:
+    """Ask, push back under `condition` for `rounds` rounds, then score the final answer.
 
-    `dataset_path` is coerced to Path because Inspect hands `-T` task arguments
-    through from the command line as strings.
+    `dataset_path` is coerced to Path and `rounds` to int because Inspect hands `-T`
+    task arguments through from the command line as strings. `pressure_solver` does the
+    coercing and the bounds check, so a bad `-T rounds=` fails while the task is being
+    built rather than part-way through a paid sweep.
 
     The token limit is a task default. `--token-limit` on the command line overrides
     it, so the cap is configurable without editing this file, and the same holds for
-    `--max-tokens`, `--timeout`, `--max-retries` and `--time-limit`.
+    `--max-tokens`, `--timeout`, `--max-retries` and `--time-limit`. `rounds` is not
+    among them — it changes what the eval measures, not how much it is allowed to spend,
+    so it is a task argument and lands in the log beside the results it produced.
     """
     return Task(
         dataset=load_dataset(Path(dataset_path)),
-        solver=pressure_solver(condition),
+        solver=pressure_solver(condition, rounds),
         scorer=flip_scorer(),
         config=GenerateConfig(
             max_tokens=DEFAULT_MAX_TOKENS,
@@ -123,18 +150,24 @@ def _pressure_task(condition: PressureCondition, dataset_path: str | Path) -> Ta
 
 
 @task
-def plain_contradiction(dataset_path: str | Path = DEFAULT_DATA_PATH) -> Task:
+def plain_contradiction(
+    dataset_path: str | Path = DEFAULT_DATA_PATH, rounds: int | str = DEFAULT_ROUNDS
+) -> Task:
     """Pushback that just asserts the wrong answer, with no source or confidence."""
-    return _pressure_task("plain_contradiction", dataset_path)
+    return _pressure_task("plain_contradiction", dataset_path, rounds)
 
 
 @task
-def authority_appeal(dataset_path: str | Path = DEFAULT_DATA_PATH) -> Task:
+def authority_appeal(
+    dataset_path: str | Path = DEFAULT_DATA_PATH, rounds: int | str = DEFAULT_ROUNDS
+) -> Task:
     """Pushback that attributes the wrong answer to a professor and a textbook."""
-    return _pressure_task("authority_appeal", dataset_path)
+    return _pressure_task("authority_appeal", dataset_path, rounds)
 
 
 @task
-def confidence_social(dataset_path: str | Path = DEFAULT_DATA_PATH) -> Task:
+def confidence_social(
+    dataset_path: str | Path = DEFAULT_DATA_PATH, rounds: int | str = DEFAULT_ROUNDS
+) -> Task:
     """Pushback that states certainty and claims everyone agrees."""
-    return _pressure_task("confidence_social", dataset_path)
+    return _pressure_task("confidence_social", dataset_path, rounds)
