@@ -173,6 +173,19 @@ On Windows, pass the task as a path relative to the repo root as shown. An absol
 raises `NotImplementedError: Non-relative patterns are unsupported` from Inspect's task
 loader on `inspect-ai==0.3.255`.
 
+**Running non-interactively? Pass `--display plain`.** `--display` defaults to `full`, a
+rich TUI that hangs when stdout is not a terminal — backgrounded, redirected to a file, or
+piped into a script. The eval starts, writes its journal entry, and then sits there: no
+error, no timeout, process still alive. A script chaining several runs with output to
+`/dev/null` will hang on the first and never reach the rest.
+
+It is worth knowing what that looks like from disk, because it is easy to misread. Inspect
+flushes samples to the `.eval` only when a task *completes*, so a run killed part-way and
+one that never started are indistinguishable — both leave an archive holding nothing but
+`_journal/start.json`, and both read back as `status='started'` with zero samples. "Zero
+samples after thirty minutes" is therefore not evidence of a stall, and reading it that way
+costs an afternoon.
+
 ### Pooling repeated passes
 
 Per-cell verdicts are not stable: the same model, item and condition re-run five times
