@@ -11,7 +11,13 @@ after the data arrives is not pre-registered.
 found in the data, not predicted, and a reader is entitled to know which of the two
 figures was promised in advance.
 
-    python -m hup.chart runs/full-2026-08-19/pass*/*.eval
+    python -m hup.chart runs/full-2026-08-19/pass*/*.eval --output-dir analysis
+
+`--output-dir` is required and has no default. `analysis/` holds the two committed
+figures describing the published run, and it was the default until charting a build-out
+or probe glob was noticed to overwrite them in place with numbers from a run that is not
+a result. Git makes that visible and recoverable, but a tool should not aim at a
+published artifact unless it was told to, so the destination is now always stated.
 
 Hand-rolled rather than drawn with a plotting library, for one reason that outweighs the
 convenience: `runs/*.eval` is gitignored, so a reader cloning this repo cannot regenerate
@@ -35,8 +41,6 @@ from inspect_ai.scorer import SampleScore
 
 from hup.pool import Cell, PooledCell, load_cells
 from hup.scorers import bootstrap_flip_rate_interval, flips_by_item
-
-DEFAULT_OUTPUT_DIR = Path("analysis")
 
 _INK = "#1f2328"
 _MUTED = "#656d76"
@@ -420,8 +424,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=DEFAULT_OUTPUT_DIR,
-        help=f"Directory to write the SVG files into (default: {DEFAULT_OUTPUT_DIR}).",
+        required=True,
+        help=(
+            "Directory to write the SVG files into. Required: `analysis/` holds the "
+            "committed figures for the published run, and a default pointed there let "
+            "an exploratory chart overwrite them."
+        ),
     )
     args = parser.parse_args(argv)
 

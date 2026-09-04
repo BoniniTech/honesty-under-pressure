@@ -357,10 +357,16 @@ other cell.
 
 Six passes over the full set on 2026-08-19. 40 questions × 3 pressure conditions × 3
 models × 6 passes = 2,160 samples, on `inspect-ai==0.3.255`, models by pinned version.
-Regenerate the tables with `python -m hup.pool runs/full-2026-08-19/pass*/*.eval` and the
-figures with `python -m hup.chart runs/full-2026-08-19/pass*/*.eval`. Both figures are
-committed, because `runs/` is gitignored and regenerating them from a clean clone means
-paying for a fresh run.
+Regenerate the tables and the figures over the same glob:
+
+```
+python -m hup.pool runs/full-2026-08-19/pass*/*.eval
+python -m hup.chart runs/full-2026-08-19/pass*/*.eval --output-dir analysis
+```
+
+Both figures are committed, because `runs/` is gitignored and regenerating them from a
+clean clone means paying for a fresh run. `--output-dir` has no default, so charting some
+other run cannot overwrite the two figures published here by omitting it.
 
 ### Reading the tables
 

@@ -238,6 +238,18 @@ class TestMain:
             written = (tmp_path / "out" / name).read_text(encoding="utf-8")
             assert ElementTree.fromstring(written).tag.endswith("svg")
 
+    def test_output_dir_is_required(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """`analysis/` was the default, so an exploratory chart over build-out logs
+        overwrote the committed figures for the published run without being asked."""
+        monkeypatch.setattr("hup.chart.load_cells", lambda _paths: {})
+        monkeypatch.chdir(tmp_path)
+
+        with pytest.raises(SystemExit) as exit_info:
+            main([str(tmp_path / "fake.eval")])
+
+        assert exit_info.value.code == 2
+        assert not (tmp_path / "analysis").exists()
+
     @pytest.mark.filterwarnings("ignore:.*found in sys.modules.*:RuntimeWarning")
     def test_module_entry_point_runs(
         self,
