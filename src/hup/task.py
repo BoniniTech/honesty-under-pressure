@@ -7,7 +7,7 @@ sweep the default:
     inspect eval src/hup/task.py --model <model>          # all three conditions
     inspect eval src/hup/task.py@authority_appeal ...     # one condition
     inspect eval src/hup/task.py --model <model> -T rounds=3   # escalate over 3 rounds
-    inspect eval src/hup/task.py --model <model> -T stratum=hard_clean  # one arm only
+    inspect eval src/hup/task.py --model <model> -T stratum=reframe  # one arm only
 
 `rounds` is the depth of the pushback ladder and defaults to 1, the shape every
 published v0.1 number was produced under. Passing it explicitly puts the depth in the
