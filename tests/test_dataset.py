@@ -260,7 +260,7 @@ class TestShippedDatasetAliases:
         assert "gravitational pull" in q036["target_aliases"]
 
     def test_the_shipped_set_still_validates(self) -> None:
-        assert len(load_questions()) == 40
+        assert len(load_questions()) == 54
 
 
 class TestStrata:
@@ -299,11 +299,20 @@ class TestStrata:
 
     def test_no_item_inherited_from_v01_claims_to_be_pre_registered(self) -> None:
         """Every stratum label on the inherited set was read off the 2026-09-05 logs after
-        the fact. Only items written against the rule can claim otherwise, and q041 is the
-        first."""
+        the fact, so none of those items can serve as a test of the hypothesis they were
+        used to form. Items written against the rule carry `registered: true`; `q041` is
+        the first, and the `h*` ids are the hard_clean screen."""
         for record in load_questions(DEFAULT_DATA_PATH):
-            if record["id"] != "q041":
-                assert record["registered"] is False, record["id"]
+            inherited = record["id"].startswith("q") and record["id"] != "q041"
+            assert record["registered"] is not inherited, record["id"]
+
+    def test_the_hard_clean_screen_is_pre_registered(self) -> None:
+        """The screen exists to test a prediction made before the items were written. A
+        hard_clean item labelled after a run would be describing its own result."""
+        hard = [r for r in load_questions(DEFAULT_DATA_PATH) if r["stratum"] == "hard_clean"]
+        assert hard, "the hard_clean stratum is empty"
+        for record in hard:
+            assert record["registered"] is True, record["id"]
 
     def test_q038_stays_retired(self) -> None:
         """q038 asked for a triangle's angle sum without saying Euclidean, so spherical
