@@ -11,7 +11,31 @@ from hup.matching import is_matchable, normalized_match
 
 DEFAULT_DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "questions.jsonl"
 
-REQUIRED_FIELDS = ("id", "question", "target", "plausible_wrong_answer", "category")
+REQUIRED_FIELDS = (
+    "id",
+    "question",
+    "target",
+    "plausible_wrong_answer",
+    "category",
+    "stratum",
+)
+
+# Which arm of the design an item belongs to. Closed set: an unrecognised value is a
+# typo that would silently create a one-item stratum, and the metrics would report it
+# as though it were a measured arm.
+#
+# `baseline`   easy fact, no true reading of the question makes the distractor correct.
+# `reframe`    easy fact, a true reading is available for the model to reach for.
+# `hard_clean` obscure but settled fact, no true reading available.
+STRATUM_KEY = "stratum"
+VALID_STRATA = ("baseline", "reframe", "hard_clean")
+
+# Whether the stratum label was assigned before the item was ever run. The eight
+# `reframe` items inherited from the v0.1 set were labelled from run data after the
+# fact, which makes them the observation that generated the hypothesis rather than a
+# test of it. Pooling those with pre-registered items would let the hypothesis confirm
+# itself, so the provenance travels with the item instead of living in a summary.
+REGISTERED_KEY = "registered"
 
 # Optional per-item lists of extra surface forms that count as naming a candidate.
 # `gravity` and `gravitational force` are the same answer, and whole-word matching sees
@@ -91,6 +115,24 @@ def _validate_record(record: dict, *, line_no: int) -> None:
                 f"matches an answer and the item would score incorrect on every turn"
             )
 
+    stratum = record[STRATUM_KEY]
+    if stratum not in VALID_STRATA:
+        raise DatasetValidationError(
+            f"line {line_no}: {STRATUM_KEY} {stratum!r} is not one of {list(VALID_STRATA)} "
+            f"(id={record['id']!r})"
+        )
+
+    if REGISTERED_KEY not in record:
+        raise DatasetValidationError(
+            f"line {line_no}: missing field {REGISTERED_KEY!r} (id={record['id']!r}); the "
+            f"stratum label's provenance decides whether the item can serve as a test of "
+            f"the hypothesis or only as the observation behind it"
+        )
+    if not isinstance(record[REGISTERED_KEY], bool):
+        raise DatasetValidationError(
+            f"line {line_no}: field {REGISTERED_KEY!r} must be a boolean (id={record['id']!r})"
+        )
+
     aliases = _validated_aliases(record, line_no=line_no)
 
     # Compare with internal whitespace collapsed. Matching escapes the candidate literally, so
@@ -132,9 +174,10 @@ def load_questions(path: Path = DEFAULT_DATA_PATH) -> list[dict]:
 
     Raises DatasetValidationError on malformed JSON, a missing/empty required
     field, a target equal to its plausible_wrong_answer, either answer that
-    whole-word matching can never match, a malformed or unmatchable alias, any
-    pair of surface forms that contain one another as whole words, a duplicate id,
-    a duplicate question, or an empty file.
+    whole-word matching can never match, an unrecognised stratum, a missing or
+    non-boolean `registered` flag, a malformed or unmatchable alias, any pair of
+    surface forms that contain one another as whole words, a duplicate id, a
+    duplicate question, or an empty file.
     """
     records: list[dict] = []
     seen_ids: set[str] = set()
@@ -182,6 +225,8 @@ def record_to_sample(record: dict) -> Sample:
             TARGET_ALIASES_KEY: record.get(TARGET_ALIASES_KEY, []),
             PLAUSIBLE_WRONG_ANSWER_ALIASES_KEY: record.get(PLAUSIBLE_WRONG_ANSWER_ALIASES_KEY, []),
             "category": record["category"],
+            STRATUM_KEY: record[STRATUM_KEY],
+            REGISTERED_KEY: record[REGISTERED_KEY],
         },
     )
 

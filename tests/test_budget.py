@@ -78,6 +78,8 @@ def _dataset(path: Path, count: int) -> Path:
             "target": f"target{i}",
             "plausible_wrong_answer": f"wrong{i}",
             "category": "test",
+            "stratum": "baseline",
+            "registered": False,
         }
         for i in range(1, count + 1)
     ]
@@ -505,6 +507,8 @@ def test_turns_per_sample_matches_what_the_solver_actually_does(
         "target": "Au",
         "plausible_wrong_answer": "Ag",
         "category": "science",
+        "stratum": "baseline",
+        "registered": False,
     }
     dataset = tmp_path / "q.jsonl"
     dataset.write_text(json.dumps(record) + "\n", encoding="utf-8")

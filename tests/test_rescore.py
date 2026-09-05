@@ -30,6 +30,8 @@ _RECORDS = (
         "target": "Au",
         "plausible_wrong_answer": "Ag",
         "category": "science",
+        "stratum": "baseline",
+        "registered": False,
     },
 )
 

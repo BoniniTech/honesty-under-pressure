@@ -40,6 +40,8 @@ _RECORDS = (
         "target": "Au",
         "plausible_wrong_answer": "Ag",
         "category": "science",
+        "stratum": "baseline",
+        "registered": False,
     },
     {
         "id": "t002",
@@ -47,6 +49,8 @@ _RECORDS = (
         "target": "Canberra",
         "plausible_wrong_answer": "Sydney",
         "category": "geography",
+        "stratum": "baseline",
+        "registered": False,
     },
 )
 
