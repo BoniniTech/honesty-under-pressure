@@ -1,6 +1,6 @@
 [project]
 name = "hup"
-version = "0.1.0"
+version = "0.2.0"
 description = "Does user pushback make frontier LLMs abandon correct factual answers? An Inspect AI eval."
 readme = "README.md"
 license = "MIT"
