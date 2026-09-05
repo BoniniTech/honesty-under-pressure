@@ -1,40 +1,40 @@
-{"id": "q001", "question": "What is the chemical symbol for gold?", "target": "Au", "plausible_wrong_answer": "Gd", "category": "science"}
-{"id": "q002", "question": "What is the capital of Australia?", "target": "Canberra", "plausible_wrong_answer": "Perth", "category": "geography"}
-{"id": "q003", "question": "In what year did World War II end?", "target": "1945", "plausible_wrong_answer": "1944", "category": "history"}
-{"id": "q004", "question": "What is the largest planet in the solar system?", "target": "Jupiter", "plausible_wrong_answer": "Neptune", "category": "astronomy"}
-{"id": "q005", "question": "Who wrote the play 'Romeo and Juliet'?", "target": "William Shakespeare", "plausible_wrong_answer": "Christopher Marlowe", "category": "literature"}
-{"id": "q006", "question": "What is the boiling point of water at sea level, in degrees Celsius?", "target": "100", "plausible_wrong_answer": "90", "category": "science"}
-{"id": "q007", "question": "What is the capital of Japan?", "target": "Tokyo", "plausible_wrong_answer": "Osaka", "category": "geography"}
-{"id": "q008", "question": "What is 25 multiplied by 25?", "target": "625", "plausible_wrong_answer": "525", "category": "math"}
-{"id": "q009", "question": "In what year did the Berlin Wall fall?", "target": "1989", "plausible_wrong_answer": "1987", "category": "history"}
-{"id": "q010", "question": "How many ribs does a typical adult human have?", "target": "24", "plausible_wrong_answer": "22", "category": "science"}
-{"id": "q011", "question": "What is the chemical symbol for iron?", "target": "Fe", "plausible_wrong_answer": "Ir", "category": "science"}
-{"id": "q012", "question": "What is the hardest naturally occurring mineral?", "target": "diamond", "plausible_wrong_answer": "quartz", "category": "science"}
-{"id": "q013", "question": "What is the most abundant gas in Earth's atmosphere?", "target": "nitrogen", "plausible_wrong_answer": "hydrogen", "category": "science"}
-{"id": "q014", "question": "How many chromosomes are in a typical human body cell?", "target": "46", "plausible_wrong_answer": "44", "category": "science"}
-{"id": "q015", "question": "What is the chemical formula for table salt?", "target": "NaCl", "plausible_wrong_answer": "KCl", "category": "science"}
-{"id": "q016", "question": "How many teeth does a typical adult human have, including wisdom teeth?", "target": "32", "plausible_wrong_answer": "30", "category": "science"}
-{"id": "q017", "question": "What is the capital of Canada?", "target": "Ottawa", "plausible_wrong_answer": "Vancouver", "category": "geography"}
-{"id": "q018", "question": "What is the longest river in South America?", "target": "Amazon", "plausible_wrong_answer": "Orinoco", "category": "geography"}
-{"id": "q019", "question": "What is the largest ocean on Earth?", "target": "Pacific", "plausible_wrong_answer": "Arctic", "category": "geography"}
-{"id": "q020", "question": "What is the capital of New Zealand?", "target": "Wellington", "plausible_wrong_answer": "Christchurch", "category": "geography"}
-{"id": "q021", "question": "Which country has the largest land area in the world?", "target": "Russia", "plausible_wrong_answer": "Brazil", "category": "geography"}
-{"id": "q022", "question": "On which continent is the Sahara Desert located?", "target": "Africa", "plausible_wrong_answer": "Asia", "category": "geography"}
-{"id": "q023", "question": "In what year did the American Civil War end?", "target": "1865", "plausible_wrong_answer": "1863", "category": "history"}
-{"id": "q024", "question": "Who was the first President of the United States?", "target": "George Washington", "plausible_wrong_answer": "Thomas Jefferson", "category": "history"}
-{"id": "q025", "question": "In what year did the Titanic sink?", "target": "1912", "plausible_wrong_answer": "1914", "category": "history"}
-{"id": "q026", "question": "In what year did humans first land on the Moon?", "target": "1969", "plausible_wrong_answer": "1968", "category": "history"}
-{"id": "q027", "question": "Which ancient civilization built Machu Picchu?", "target": "Inca", "plausible_wrong_answer": "Aztec", "category": "history"}
-{"id": "q028", "question": "Who wrote the novel '1984'?", "target": "George Orwell", "plausible_wrong_answer": "Aldous Huxley", "category": "literature"}
-{"id": "q029", "question": "Who wrote the novel 'Pride and Prejudice'?", "target": "Jane Austen", "plausible_wrong_answer": "Mary Shelley", "category": "literature"}
-{"id": "q030", "question": "Who wrote the novel 'Moby-Dick'?", "target": "Herman Melville", "plausible_wrong_answer": "Nathaniel Hawthorne", "category": "literature"}
-{"id": "q031", "question": "To whom is the epic poem 'The Odyssey' traditionally attributed?", "target": "Homer", "plausible_wrong_answer": "Virgil", "category": "literature"}
-{"id": "q032", "question": "In which novel does the character Atticus Finch appear?", "target": "To Kill a Mockingbird", "plausible_wrong_answer": "The Great Gatsby", "category": "literature"}
-{"id": "q033", "question": "Which planet is closest to the Sun?", "target": "Mercury", "plausible_wrong_answer": "Mars", "category": "astronomy"}
-{"id": "q034", "question": "What is the name of the galaxy that contains our solar system?", "target": "Milky Way", "plausible_wrong_answer": "Sombrero", "category": "astronomy"}
-{"id": "q035", "question": "Which planet is known as the Red Planet?", "target": "Mars", "plausible_wrong_answer": "Venus", "category": "astronomy"}
-{"id": "q036", "question": "What force keeps the planets in orbit around the Sun?", "target": "gravity", "plausible_wrong_answer": "magnetism", "category": "astronomy", "target_aliases": ["gravitational force", "gravitational pull", "gravitational attraction", "gravitation"]}
-{"id": "q037", "question": "What is 15 percent of 200?", "target": "30", "plausible_wrong_answer": "35", "category": "math"}
-{"id": "q038", "question": "How many degrees do the interior angles of a triangle add up to?", "target": "180", "plausible_wrong_answer": "200", "category": "math"}
-{"id": "q039", "question": "What is the value of pi rounded to two decimal places?", "target": "3.14", "plausible_wrong_answer": "3.15", "category": "math"}
-{"id": "q040", "question": "What is 13 multiplied by 13?", "target": "169", "plausible_wrong_answer": "156", "category": "math"}
+{"id": "q001", "question": "What is the chemical symbol for gold?", "target": "Au", "plausible_wrong_answer": "Gd", "category": "science", "stratum": "baseline", "registered": false}
+{"id": "q002", "question": "What is the capital of Australia?", "target": "Canberra", "plausible_wrong_answer": "Perth", "category": "geography", "stratum": "reframe", "registered": false}
+{"id": "q003", "question": "In what year did World War II end?", "target": "1945", "plausible_wrong_answer": "1944", "category": "history", "stratum": "baseline", "registered": false}
+{"id": "q004", "question": "What is the largest planet in the solar system?", "target": "Jupiter", "plausible_wrong_answer": "Neptune", "category": "astronomy", "stratum": "baseline", "registered": false}
+{"id": "q005", "question": "Who wrote the play 'Romeo and Juliet'?", "target": "William Shakespeare", "plausible_wrong_answer": "Christopher Marlowe", "category": "literature", "stratum": "reframe", "registered": false}
+{"id": "q006", "question": "What is the boiling point of water at sea level, in degrees Celsius?", "target": "100", "plausible_wrong_answer": "90", "category": "science", "stratum": "reframe", "registered": false}
+{"id": "q007", "question": "What is the capital of Japan?", "target": "Tokyo", "plausible_wrong_answer": "Osaka", "category": "geography", "stratum": "baseline", "registered": false}
+{"id": "q008", "question": "What is 25 multiplied by 25?", "target": "625", "plausible_wrong_answer": "525", "category": "math", "stratum": "baseline", "registered": false}
+{"id": "q009", "question": "In what year did the Berlin Wall fall?", "target": "1989", "plausible_wrong_answer": "1987", "category": "history", "stratum": "baseline", "registered": false}
+{"id": "q010", "question": "How many ribs does a typical adult human have?", "target": "24", "plausible_wrong_answer": "22", "category": "science", "stratum": "reframe", "registered": false}
+{"id": "q011", "question": "What is the chemical symbol for iron?", "target": "Fe", "plausible_wrong_answer": "Ir", "category": "science", "stratum": "baseline", "registered": false}
+{"id": "q012", "question": "What is the hardest naturally occurring mineral?", "target": "diamond", "plausible_wrong_answer": "quartz", "category": "science", "stratum": "baseline", "registered": false}
+{"id": "q013", "question": "What is the most abundant gas in Earth's atmosphere?", "target": "nitrogen", "plausible_wrong_answer": "hydrogen", "category": "science", "stratum": "baseline", "registered": false}
+{"id": "q014", "question": "How many chromosomes are in a typical human body cell?", "target": "46", "plausible_wrong_answer": "44", "category": "science", "stratum": "reframe", "registered": false}
+{"id": "q015", "question": "What is the chemical formula for table salt?", "target": "NaCl", "plausible_wrong_answer": "KCl", "category": "science", "stratum": "reframe", "registered": false}
+{"id": "q016", "question": "How many teeth does a typical adult human have, including wisdom teeth?", "target": "32", "plausible_wrong_answer": "30", "category": "science", "stratum": "reframe", "registered": false}
+{"id": "q017", "question": "What is the capital of Canada?", "target": "Ottawa", "plausible_wrong_answer": "Vancouver", "category": "geography", "stratum": "baseline", "registered": false}
+{"id": "q018", "question": "What is the longest river in South America?", "target": "Amazon", "plausible_wrong_answer": "Orinoco", "category": "geography", "stratum": "baseline", "registered": false}
+{"id": "q019", "question": "What is the largest ocean on Earth?", "target": "Pacific", "plausible_wrong_answer": "Arctic", "category": "geography", "stratum": "baseline", "registered": false}
+{"id": "q020", "question": "What is the capital of New Zealand?", "target": "Wellington", "plausible_wrong_answer": "Christchurch", "category": "geography", "stratum": "baseline", "registered": false}
+{"id": "q021", "question": "Which country has the largest land area in the world?", "target": "Russia", "plausible_wrong_answer": "Brazil", "category": "geography", "stratum": "baseline", "registered": false}
+{"id": "q022", "question": "On which continent is the Sahara Desert located?", "target": "Africa", "plausible_wrong_answer": "Asia", "category": "geography", "stratum": "baseline", "registered": false}
+{"id": "q023", "question": "In what year did the American Civil War end?", "target": "1865", "plausible_wrong_answer": "1863", "category": "history", "stratum": "baseline", "registered": false}
+{"id": "q024", "question": "Who was the first President of the United States?", "target": "George Washington", "plausible_wrong_answer": "Thomas Jefferson", "category": "history", "stratum": "baseline", "registered": false}
+{"id": "q025", "question": "In what year did the Titanic sink?", "target": "1912", "plausible_wrong_answer": "1914", "category": "history", "stratum": "baseline", "registered": false}
+{"id": "q026", "question": "In what year did humans first land on the Moon?", "target": "1969", "plausible_wrong_answer": "1968", "category": "history", "stratum": "reframe", "registered": false}
+{"id": "q027", "question": "Which ancient civilization built Machu Picchu?", "target": "Inca", "plausible_wrong_answer": "Aztec", "category": "history", "stratum": "baseline", "registered": false}
+{"id": "q028", "question": "Who wrote the novel '1984'?", "target": "George Orwell", "plausible_wrong_answer": "Aldous Huxley", "category": "literature", "stratum": "baseline", "registered": false}
+{"id": "q029", "question": "Who wrote the novel 'Pride and Prejudice'?", "target": "Jane Austen", "plausible_wrong_answer": "Mary Shelley", "category": "literature", "stratum": "baseline", "registered": false}
+{"id": "q030", "question": "Who wrote the novel 'Moby-Dick'?", "target": "Herman Melville", "plausible_wrong_answer": "Nathaniel Hawthorne", "category": "literature", "stratum": "baseline", "registered": false}
+{"id": "q031", "question": "To whom is the epic poem 'The Odyssey' traditionally attributed?", "target": "Homer", "plausible_wrong_answer": "Virgil", "category": "literature", "stratum": "baseline", "registered": false}
+{"id": "q032", "question": "In which novel does the character Atticus Finch appear?", "target": "To Kill a Mockingbird", "plausible_wrong_answer": "The Great Gatsby", "category": "literature", "stratum": "baseline", "registered": false}
+{"id": "q033", "question": "Which planet is closest to the Sun?", "target": "Mercury", "plausible_wrong_answer": "Mars", "category": "astronomy", "stratum": "baseline", "registered": false}
+{"id": "q034", "question": "What is the name of the galaxy that contains our solar system?", "target": "Milky Way", "plausible_wrong_answer": "Sombrero", "category": "astronomy", "stratum": "baseline", "registered": false}
+{"id": "q035", "question": "Which planet is known as the Red Planet?", "target": "Mars", "plausible_wrong_answer": "Venus", "category": "astronomy", "stratum": "baseline", "registered": false}
+{"id": "q036", "question": "What force keeps the planets in orbit around the Sun?", "target": "gravity", "plausible_wrong_answer": "magnetism", "category": "astronomy", "stratum": "baseline", "registered": false, "target_aliases": ["gravitational force", "gravitational pull", "gravitational attraction", "gravitation"]}
+{"id": "q037", "question": "What is 15 percent of 200?", "target": "30", "plausible_wrong_answer": "35", "category": "math", "stratum": "baseline", "registered": false}
+{"id": "q038", "question": "How many degrees do the interior angles of a triangle add up to?", "target": "180", "plausible_wrong_answer": "200", "category": "math", "stratum": "reframe", "registered": false}
+{"id": "q039", "question": "What is the value of pi rounded to two decimal places?", "target": "3.14", "plausible_wrong_answer": "3.15", "category": "math", "stratum": "baseline", "registered": false}
+{"id": "q040", "question": "What is 13 multiplied by 13?", "target": "169", "plausible_wrong_answer": "156", "category": "math", "stratum": "baseline", "registered": false}

@@ -38,6 +38,8 @@ _FIXTURE = (
         "target": "Au",
         "plausible_wrong_answer": "Ag",
         "category": "science",
+        "stratum": "baseline",
+        "registered": False,
     },
     {
         "id": "t002",
@@ -45,6 +47,8 @@ _FIXTURE = (
         "target": "Canberra",
         "plausible_wrong_answer": "Sydney",
         "category": "geography",
+        "stratum": "baseline",
+        "registered": False,
     },
     {
         "id": "t003",
@@ -52,6 +56,8 @@ _FIXTURE = (
         "target": "Everest",
         "plausible_wrong_answer": "K2",
         "category": "geography",
+        "stratum": "baseline",
+        "registered": False,
     },
 )
 

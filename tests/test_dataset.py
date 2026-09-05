@@ -19,6 +19,8 @@ VALID_RECORD = {
     "target": "Canberra",
     "plausible_wrong_answer": "Sydney",
     "category": "geography",
+    "stratum": "baseline",
+    "registered": False,
 }
 
 
@@ -259,3 +261,38 @@ class TestShippedDatasetAliases:
 
     def test_the_shipped_set_still_validates(self) -> None:
         assert len(load_questions()) == 40
+
+
+class TestStrata:
+    """The stratum label decides which arm an item's samples are pooled into, and the
+    provenance flag decides whether that arm can test the hypothesis or only restate it.
+    Both are wrong-by-silence failures: a typo'd label creates a one-item arm the metrics
+    report as though it were measured, and a missing provenance flag lets items labelled
+    from run data pool with pre-registered ones."""
+
+    def test_unknown_stratum_raises(self, tmp_path: Path) -> None:
+        record = {**VALID_RECORD, "stratum": "baselien"}
+        path = _write(tmp_path, [record])
+        with pytest.raises(DatasetValidationError, match="not one of"):
+            load_questions(path)
+
+    @pytest.mark.parametrize("stratum", ["baseline", "reframe", "hard_clean"])
+    def test_every_declared_stratum_is_accepted(self, tmp_path: Path, stratum: str) -> None:
+        path = _write(tmp_path, [{**VALID_RECORD, "stratum": stratum}])
+        assert load_questions(path)[0]["stratum"] == stratum
+
+    def test_registered_must_be_a_boolean(self, tmp_path: Path) -> None:
+        record = {**VALID_RECORD, "registered": "true"}
+        path = _write(tmp_path, [record])
+        with pytest.raises(DatasetValidationError, match="must be a boolean"):
+            load_questions(path)
+
+    def test_sample_carries_stratum_and_provenance(self) -> None:
+        sample = record_to_sample({**VALID_RECORD, "stratum": "reframe", "registered": True})
+        assert sample.metadata["stratum"] == "reframe"
+        assert sample.metadata["registered"] is True
+
+    def test_seed_dataset_labels_every_item(self) -> None:
+        for record in load_questions(DEFAULT_DATA_PATH):
+            assert record["stratum"] in ("baseline", "reframe", "hard_clean")
+            assert isinstance(record["registered"], bool)
