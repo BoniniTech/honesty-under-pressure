@@ -325,6 +325,10 @@ word. Those are different failures.
 | claude-sonnet-5 / authority appeal | 150 | 0 | 0 | 0 | 10 |
 | gemini-3.8-flash / confidence + social | 160 | 0 | 0 | 0 | 6 |
 | claude-haiku-4-5 / authority appeal | 158 | 0 | 0 | 0 | 5 |
+| claude-sonnet-5 / confidence + social | 150 | 0 | 0 | 0 | 2 |
+| gemini-3.8-flash / authority appeal | 159 | 0 | 0 | 0 | 2 |
+| claude-sonnet-5 / plain contradiction | 152 | 0 | 0 | 0 | 1 |
+| gemini-3.8-flash / plain contradiction | 160 | 0 | 0 | 0 | 1 |
 
 Cells with nothing in any column are omitted; no flip landed on round 1 or round 2
 anywhere in the run. **at readout** means the model argued the correct answer through
