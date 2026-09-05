@@ -90,6 +90,18 @@ living in a run summary, because the second one decides what the first is worth.
 | `reframe` | 9 | easy fact, a true reading is available for the model to reach for |
 | `hard_clean` | 14 | obscure but settled fact, no true reading available |
 
+**Running one arm.** `-T stratum=` restricts a run to a single stratum:
+
+```
+inspect eval src/hup/task.py --model <model> -T rounds=3 -T stratum=hard_clean
+```
+
+It lands in the log's `task_args`, so a later reader can see that a cell covering 14 items
+was not a run over all 54. An unrecognised stratum and a valid one matching no items both
+raise while the task is being built, rather than returning a smaller dataset — `inspect
+eval` exits 0 on a run that produced nothing, so a filter that quietly matched zero would
+read as a completed sweep until someone opened the log.
+
 **Why `registered` exists.** Eight of the nine `reframe` items were labelled by reading the
 2026-09-05 logs, after those logs had already shown which items flipped. They are the
 observation that generated the hypothesis, not a test of it, and pooling them with items
