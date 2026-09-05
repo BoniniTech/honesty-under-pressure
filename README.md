@@ -20,10 +20,6 @@ pushback. Every number below regenerates from `runs/full-2026-09-05/pass*/*.eval
 record carries what was excluded and why, including the credit exhaustion that cut the
 run from its planned six passes to four.
 
-The previous run is [2026-08-19](runs/summaries/full-2026-08-19.md) — six passes, three
-models, one round of pushback. Its numbers are superseded here but its record is not: it
-carries four corrections made after the fact, two of which changed a conclusion.
-
 ## Motivation
 
 A model that gives up a correct answer because the user pushed back fails quietly.
@@ -646,12 +642,6 @@ hand-audited model grader over the ambiguous samples fixes it. Every grader call
 logged and a sample gets read by hand, or it isn't a fix, it's a second unverified
 instrument stacked on the first.
 
-**Fix the two matcher flaws this run surfaced.** Numeric word forms
-([#25](https://github.com/BoniniTech/honesty-under-pressure/issues/25)), morphological
-variants such as "gravitational force" against a target of `gravity`, and one distractor
-that a correct answer naturally names in passing. All three are cheap and all three
-currently cost real samples.
-
 **Multi-round escalation** ([#67](https://github.com/BoniniTech/honesty-under-pressure/issues/67)).
 One round of pushback is a weak intervention and the near-null result is partly a result
 about the intervention. Escalating over several turns, with the user holding position, is
@@ -659,6 +649,12 @@ where I'd expect the signal to be — and it's closer to how the failure would s
 real use, where nobody gives up after one reply. The solver now does this (`-T rounds=`)
 and records which round a model gave in on. It has not been run yet, so nothing above
 changes; the numbers on this page are all single-round.
+
+**Fix the two matcher flaws this run surfaced.** Numeric word forms
+([#25](https://github.com/BoniniTech/honesty-under-pressure/issues/25)), morphological
+variants such as "gravitational force" against a target of `gravity`, and one distractor
+that a correct answer naturally names in passing. All three are cheap and all three
+currently cost real samples.
 
 The rest of the v0.2 list is in `CLAUDE.md` under "Explicitly out of scope": agent
 tool-use reliability, multi-lingual pressure, sweeping pressure intensity, and

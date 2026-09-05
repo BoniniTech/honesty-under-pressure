@@ -5,6 +5,7 @@ cost and duration caps, the failure modes worth knowing before you spend money, 
 the exact commands that regenerate the published numbers.
 
 For what the eval measures and what it found, see the [README](../README.md).
+
 ## Prerequisites
 
 - **Python 3.11 or newer** — `pyproject.toml` sets `requires-python = ">=3.11"`.
@@ -81,7 +82,7 @@ gave two flips, two ambiguous and one hold. See
 once, so results come from several passes pooled together:
 
 ```bash
-python -m hup.pool runs/full-2026-08-19/pass*/*.eval
+python -m hup.pool runs/full-2026-09-05/pass*/*.eval
 ```
 
 Under the metric table it prints where each cell's flips happened — the round the model
@@ -94,11 +95,12 @@ Pooling passes that ran **different escalation depths** into one cell is refused
 one-round pass and a three-round pass produce the same cells, the same sample counts and
 the same columns, so nothing in the table would show that the flip rate describes neither.
 
-Glob the pass directories, not `runs/full-2026-08-19/*.eval`. `runs/full-2026-08-19/`
-also holds `partial-hang/`, `failed-3.7-alias/`, `superseded/` and `pre-rescore/`, which
-are runs kept on purpose — three as a record of what went wrong, one as the original
-scoring of the passes themselves — and all four must stay out of any pooled number. The
-narrower glob excludes them by construction; the wider one silently includes them.
+Glob the pass directories, not `runs/full-2026-09-05/*.eval`. A run directory also
+holds the logs of whatever went wrong — here `credit-exhausted/` for the two passes the
+Anthropic balance cut short, and `failed-timeout/` for one condition that died on
+`RetryError(TimeoutError)` and was re-run. Those are kept on purpose and must stay out of
+any pooled number. The narrower glob excludes them by construction; the wider one
+silently includes them.
 
 Google needs throttling. At the default 10 concurrent connections `gemini` returns
 `ServerError` often enough that a sample exhausts its retries and takes the task down
@@ -190,9 +192,10 @@ python -m hup.pool runs/full-2026-09-05/pass*/*.eval
 `--display plain` is required, not cosmetic: `inspect eval` defaults to a rich TUI that
 hangs when stdout is not a terminal, with no error and no timeout.
 
-The v0.1 results were produced the same way at one round, over
-`openai/gpt-4o-mini-2024-07-18`, `anthropic/claude-haiku-4-5-20251001` and
-`google/gemini-3.6-flash`, into `runs/full-2026-08-19/`.
+`--max-connections 5` is on every model here because that is what the run did — all 48
+logs record it — and this block reproduces the run rather than improving on it. Only
+Google needs it (see [Pooling repeated passes](#pooling-repeated-passes)); a fresh run
+can leave the other three at the default 10 and go faster for it.
 
 `rounds=1` is the current default, so it could be left off. It is written out because
 this block has to keep regenerating these numbers after the default moves, and because a
@@ -201,7 +204,7 @@ was default on which day.
 
 Everything else comes from the task defaults in `src/hup/task.py`: `token_limit` 10,000,
 `max_tokens` 3,000, `timeout` 120s, `max_retries` 5 and `time_limit` 600s. Sampling is
-left at each provider's default, so passes differ, which is the point of running six.
+left at each provider's default, so passes differ, which is the point of running four.
 One caveat on `max_tokens`: the run itself used 2,000, raised afterwards as headroom for
 the extra escalation turns. Nothing truncated at either value, so the results reproduce
 at the current default — but the number above is today's setting, not a record of that
@@ -210,10 +213,10 @@ run's.
 A scorer change can be applied to logs you already have, without paying for a run:
 
 ```bash
-python -m hup.rescore runs/full-2026-08-19/pass*/*.eval
+python -m hup.rescore runs/full-2026-09-05/pass*/*.eval
 ```
 
-This is how the markdown-emphasis fix reached the table above. It works because the
+This is how the markdown-emphasis fix reached the published table. It works because the
 scorer is pure containment over text already in the log — no provider calls, though
 Inspect still initialises a client for the model named in the log, so it wants a key in
 the environment and any string will do.
@@ -222,23 +225,19 @@ the environment and any string will do.
 
 Not every scoring fix re-scores. Answer aliases live in each sample's metadata, written
 when the sample ran, so a log recorded before the field existed carries no aliases and
-re-scoring reads none. The `q036` fix therefore does not appear in the table above: eight
-samples that answered correctly are still recorded as naming no candidate. With aliases
-applied, `gpt-4o-mini` would read `0.9833`, `0.9875` and `0.9917` for eligibility across
-its three conditions instead of `0.9708`, `0.9708` and `0.9875`. No flip rate and no
-interval moves either way.
-
-Those numbers are stated rather than published, because the run that produced this table
-did not have them. A fresh run gets them for free.
+re-scoring reads none. An alias added today cannot reach a sample that ran yesterday, and
+`python -m hup.rescore` will not tell you it fell short — it reads the metadata that is
+there.
 
 The distinction generalises: a change to the scorer's own logic backdates, a change to
 what the dataset records about a sample does not. Aliases sit in the dataset because that
-is where a human can review them, and the cost of that choice is exactly this.
+is where a human can review them, and the cost of that choice is exactly this. Anything
+in the second class needs a fresh run to take effect.
 
 Inspect does not record the command line, so the block above is reconstructed from what
-the logs say was in force rather than copied from a shell history. That distinction
-earned its keep: three of this run's 54 logs were written before the commit that added
-the last three of those settings, and `runs/summaries/full-2026-08-19.md` records what
-that does and does not affect. The per-call `ModelEvent` config in a log is the view that
-answers the question. `eval.model_generate_config` is not, because it holds the
-CLI-level config and reads as `None` even where the task set a value.
+the logs say was in force rather than copied from a shell history. Read the per-call
+`ModelEvent` config for that, not `eval.model_generate_config`, which holds only the
+CLI-level config and reads as `None` wherever the task set the value instead. A log
+written before a settings commit landed will differ from one written after, and the
+`ModelEvent` config is the only place that shows it.
+
