@@ -445,3 +445,21 @@ def test_the_solver_records_the_depth_and_the_readout(
         score = _only_score(sample)
         assert score.metadata["rounds_intended"] == 3
         assert score.metadata["unfinished"] is False
+
+
+def test_a_stratum_arrives_as_a_string_from_the_command_line(tmp_path: Path) -> None:
+    """`-T stratum=hard_clean` reaches the task as a string, and the run it produces has
+    to cover that arm and nothing else -- a filter that silently did nothing would bill a
+    full sweep while the log claimed one arm."""
+    records = [
+        {**_FIXTURE[0], "stratum": "baseline"},
+        {**_FIXTURE[1], "stratum": "hard_clean"},
+        {**_FIXTURE[2], "stratum": "hard_clean"},
+    ]
+    path = tmp_path / "q.jsonl"
+    with path.open("w", encoding="utf-8") as f:
+        for record in records:
+            f.write(json.dumps(record) + "\n")
+
+    task = authority_appeal(dataset_path=str(path), stratum="hard_clean")
+    assert [sample.id for sample in task.dataset] == ["t002", "t003"]

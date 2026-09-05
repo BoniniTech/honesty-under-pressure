@@ -7,6 +7,7 @@ sweep the default:
     inspect eval src/hup/task.py --model <model>          # all three conditions
     inspect eval src/hup/task.py@authority_appeal ...     # one condition
     inspect eval src/hup/task.py --model <model> -T rounds=3   # escalate over 3 rounds
+    inspect eval src/hup/task.py --model <model> -T stratum=hard_clean  # one arm only
 
 `rounds` is the depth of the pushback ladder and defaults to 1, the shape every
 published v0.1 number was produced under. Passing it explicitly puts the depth in the
@@ -120,7 +121,10 @@ DEFAULT_TIME_LIMIT = 600
 
 
 def _pressure_task(
-    condition: PressureCondition, dataset_path: str | Path, rounds: int | str
+    condition: PressureCondition,
+    dataset_path: str | Path,
+    rounds: int | str,
+    stratum: str | None,
 ) -> Task:
     """Ask, push back under `condition` for `rounds` rounds, then score the final answer.
 
@@ -133,10 +137,13 @@ def _pressure_task(
     it, so the cap is configurable without editing this file, and the same holds for
     `--max-tokens`, `--timeout`, `--max-retries` and `--time-limit`. `rounds` is not
     among them — it changes what the eval measures, not how much it is allowed to spend,
-    so it is a task argument and lands in the log beside the results it produced.
+    so it is a task argument and lands in the log beside the results it produced. The same
+    holds for `stratum`, which restricts the run to one arm of the design: it changes which
+    questions were asked, so it belongs in `task_args` where a later reader can see that a
+    cell covering 14 items was not a run over all 54.
     """
     return Task(
-        dataset=load_dataset(Path(dataset_path)),
+        dataset=load_dataset(Path(dataset_path), stratum=stratum),
         solver=pressure_solver(condition, rounds),
         scorer=flip_scorer(),
         config=GenerateConfig(
@@ -151,23 +158,29 @@ def _pressure_task(
 
 @task
 def plain_contradiction(
-    dataset_path: str | Path = DEFAULT_DATA_PATH, rounds: int | str = DEFAULT_ROUNDS
+    dataset_path: str | Path = DEFAULT_DATA_PATH,
+    rounds: int | str = DEFAULT_ROUNDS,
+    stratum: str | None = None,
 ) -> Task:
     """Pushback that just asserts the wrong answer, with no source or confidence."""
-    return _pressure_task("plain_contradiction", dataset_path, rounds)
+    return _pressure_task("plain_contradiction", dataset_path, rounds, stratum)
 
 
 @task
 def authority_appeal(
-    dataset_path: str | Path = DEFAULT_DATA_PATH, rounds: int | str = DEFAULT_ROUNDS
+    dataset_path: str | Path = DEFAULT_DATA_PATH,
+    rounds: int | str = DEFAULT_ROUNDS,
+    stratum: str | None = None,
 ) -> Task:
     """Pushback that attributes the wrong answer to a professor and a textbook."""
-    return _pressure_task("authority_appeal", dataset_path, rounds)
+    return _pressure_task("authority_appeal", dataset_path, rounds, stratum)
 
 
 @task
 def confidence_social(
-    dataset_path: str | Path = DEFAULT_DATA_PATH, rounds: int | str = DEFAULT_ROUNDS
+    dataset_path: str | Path = DEFAULT_DATA_PATH,
+    rounds: int | str = DEFAULT_ROUNDS,
+    stratum: str | None = None,
 ) -> Task:
     """Pushback that states certainty and claims everyone agrees."""
-    return _pressure_task("confidence_social", dataset_path, rounds)
+    return _pressure_task("confidence_social", dataset_path, rounds, stratum)

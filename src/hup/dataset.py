@@ -231,7 +231,31 @@ def record_to_sample(record: dict) -> Sample:
     )
 
 
-def load_dataset(path: Path = DEFAULT_DATA_PATH) -> Dataset:
-    """Validate questions.jsonl and load it as an Inspect Dataset."""
+def load_dataset(path: Path = DEFAULT_DATA_PATH, stratum: str | None = None) -> Dataset:
+    """Validate questions.jsonl and load it as an Inspect Dataset.
+
+    `stratum` restricts the dataset to one arm of the design. Omitted, every item loads.
+
+    Both failure modes raise rather than returning a smaller dataset, because
+    `inspect eval` exits 0 on a run that produced nothing and writes a log with
+    `status='error'` and zero samples. A stratum that silently matched nothing would
+    look like a completed sweep until someone read the log.
+    """
     load_questions(path)
-    return json_dataset(str(path), record_to_sample)
+    dataset = json_dataset(str(path), record_to_sample)
+    if stratum is None:
+        return dataset
+
+    if stratum not in VALID_STRATA:
+        raise DatasetValidationError(f"stratum {stratum!r} is not one of {list(VALID_STRATA)}")
+
+    filtered = dataset.filter(
+        lambda sample: (sample.metadata or {}).get(STRATUM_KEY) == stratum,
+        name=f"{dataset.name}-{stratum}" if dataset.name else stratum,
+    )
+    if len(filtered) == 0:
+        raise DatasetValidationError(
+            f"stratum {stratum!r} matched no items in {path}; the stratum is valid but "
+            f"empty, and running it would produce a log with zero samples that exits 0"
+        )
+    return filtered
