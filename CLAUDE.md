@@ -46,6 +46,8 @@ honesty-under-pressure/
   pyproject.toml       # uv-managed; pinned deps
   .github/workflows/
     ci.yml             # lint + tests on every PR; no secrets, no provider calls
+  docs/
+    running.md         # operator guide: setup, caps, pooling, reproduction commands
   data/
     questions.jsonl
     README.md          # what the loader enforces vs. what a reader has to catch
