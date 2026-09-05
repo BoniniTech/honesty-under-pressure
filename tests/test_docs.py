@@ -85,3 +85,60 @@ def test_eval_globs_are_scoped_to_pass_directories(doc: str, module: str, args: 
             f"Use runs/<run>/pass*/*.eval — the wider glob silently pools the runs kept "
             f"under runs/<run>/ as a record of what went wrong."
         )
+
+
+# A transcript is a paragraph quoting both sides of an exchange. Matching the *paragraph*
+# rather than a line is deliberate: the defect this guards against welded the citation
+# onto the first quoted line (`Source: > **User:** How many...`), which no line-anchored
+# pattern sees as a quote at all, so it would have been skipped rather than failed.
+_USER_TURN = "**User:**"
+_MODEL_TURN = "**Model:**"
+
+# `<path>.eval`, then a sample id, then an epoch, in that order. CLAUDE.md, "Writing up a
+# run", item 6. The path may wrap, so the separator is any run of whitespace.
+_CITATION = re.compile(r"\.eval`?,?\s*sample `\w+`, epoch \d+")
+
+# Two transcripts in docs/transcripts.md and one abridged in the README. Asserted as a
+# floor so that losing one, or a matcher that stops recognising one, fails loudly instead
+# of quietly checking fewer things.
+_EXPECTED_TRANSCRIPTS = 3
+
+
+def _transcripts() -> list[tuple[str, int, str]]:
+    """Every quoted transcript in live Markdown, as (doc path, line number, preceding text)."""
+    found = []
+    for path in _live_docs():
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        text = path.read_text(encoding="utf-8")
+        offset = 1
+        for block in text.split("\n\n"):
+            is_quote = any(line.lstrip().startswith(">") for line in block.split("\n"))
+            if is_quote and _USER_TURN in block and _MODEL_TURN in block:
+                preamble = "\n".join(text[: text.index(block)].split("\n")[-5:])
+                found.append((relative, offset, preamble))
+            offset += block.count("\n") + 2
+    return found
+
+
+def test_docs_contain_every_known_transcript() -> None:
+    """Guards the check below: a matcher that found nothing would pass silently."""
+    found = _transcripts()
+    assert len(found) >= _EXPECTED_TRANSCRIPTS, (
+        f"expected at least {_EXPECTED_TRANSCRIPTS} quoted transcripts, matched {len(found)}: "
+        f"{[f'{doc}:{line}' for doc, line, _ in found]}. Either a transcript was lost, or the "
+        f"matcher stopped recognising one — both mean this file is checking less than it says."
+    )
+
+
+@pytest.mark.parametrize("doc,line,preamble", _transcripts())
+def test_quoted_transcripts_carry_a_citation(doc: str, line: int, preamble: str) -> None:
+    """A quoted transcript names the log it came from, its sample and its epoch.
+
+    The logs are gitignored, so a reader cannot go and look — the citation is the only
+    thing tying a quote to the run that produced it. A docs move dropped one on
+    2026-09-05 and green CI said nothing, because nothing compared them.
+    """
+    assert _CITATION.search(preamble), (
+        f"{doc}:{line} quotes a transcript with no `.eval` path, sample id and epoch in "
+        f"the lines above it. CLAUDE.md, 'Writing up a run', item 6."
+    )
