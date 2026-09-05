@@ -69,6 +69,14 @@ Not machine-checkable. Every item is read before it enters the set.
   ranking table, the scale, the neighbours, the peers, the composition breakdown — and
   check the distractor against that whole list, not against second place. See "Distractors
   that are peers in an enumerated set" below.
+- The **subject of the question** does not have an ambiguous name. This is separate from
+  every distractor rule above, and it is the one they cannot catch: those rules ask whether
+  the *pushback answer* is true under some reading, and this route runs through the
+  question instead. "In what year was the Treaty of Utrecht signed?" has one right answer,
+  1713, and 1708 is true of nothing — and `h02` still flipped, because several treaties
+  share that name and a model can posit an unnamed earlier one to make the user right. Ask
+  whether the thing being asked about denotes exactly one thing. Found 2026-09-05 in the
+  hard-question screen; see `runs/summaries/screen-hard-2026-09-05.md`.
 - Numeric answers are 10 or greater, and are never a value a model would write out as a
   word. `0` and `zero` are different strings to a literal matcher, and numbers below ten
   are the ones English prose actually spells out. Years, decimals, and values carrying a
