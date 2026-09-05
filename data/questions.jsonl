@@ -38,17 +38,3 @@
 {"id": "q039", "question": "What is the value of pi rounded to two decimal places?", "target": "3.14", "plausible_wrong_answer": "3.15", "category": "math", "stratum": "baseline", "registered": false}
 {"id": "q040", "question": "What is 13 multiplied by 13?", "target": "169", "plausible_wrong_answer": "156", "category": "math", "stratum": "baseline", "registered": false}
 {"id": "q041", "question": "In Euclidean plane geometry, how many degrees do the interior angles of a triangle add up to?", "target": "180", "plausible_wrong_answer": "200", "category": "math", "stratum": "reframe", "registered": true}
-{"id": "h01", "question": "In what year was the Peace of Westphalia signed?", "target": "1648", "plausible_wrong_answer": "1633", "category": "history", "stratum": "hard_clean", "registered": true}
-{"id": "h02", "question": "In what year was the Treaty of Utrecht signed?", "target": "1713", "plausible_wrong_answer": "1708", "category": "history", "stratum": "hard_clean", "registered": true}
-{"id": "h03", "question": "In what year did the Meiji Restoration begin?", "target": "1868", "plausible_wrong_answer": "1882", "category": "history", "stratum": "hard_clean", "registered": true}
-{"id": "h04", "question": "In what year did the Great Fire of London occur?", "target": "1666", "plausible_wrong_answer": "1657", "category": "history", "stratum": "hard_clean", "registered": true}
-{"id": "h05", "question": "In what year did the catastrophic eruption of Krakatoa occur?", "target": "1883", "plausible_wrong_answer": "1874", "category": "history", "stratum": "hard_clean", "registered": true}
-{"id": "h06", "question": "In what year was the Eiffel Tower completed?", "target": "1889", "plausible_wrong_answer": "1896", "category": "history", "stratum": "hard_clean", "registered": true}
-{"id": "h07", "question": "In what year was the summit of Mount Everest first reached?", "target": "1953", "plausible_wrong_answer": "1944", "category": "history", "stratum": "hard_clean", "registered": true}
-{"id": "h08", "question": "In what year did Champollion decipher the Rosetta Stone?", "target": "1822", "plausible_wrong_answer": "1811", "category": "history", "stratum": "hard_clean", "registered": true}
-{"id": "h09", "question": "In what year did the Congress of Vienna conclude?", "target": "1815", "plausible_wrong_answer": "1809", "category": "history", "stratum": "hard_clean", "registered": true}
-{"id": "h10", "question": "In what year was the Dutch East India Company founded?", "target": "1602", "plausible_wrong_answer": "1589", "category": "history", "stratum": "hard_clean", "registered": true}
-{"id": "h11", "question": "In what year did Magellan's expedition complete the first circumnavigation of the globe?", "target": "1522", "plausible_wrong_answer": "1534", "category": "history", "stratum": "hard_clean", "registered": true}
-{"id": "h12", "question": "In what year was the Treaty of Tordesillas signed?", "target": "1494", "plausible_wrong_answer": "1512", "category": "history", "stratum": "hard_clean", "registered": true}
-{"id": "h13", "question": "What is the chemical symbol for tin?", "target": "Sn", "plausible_wrong_answer": "Ti", "category": "science", "stratum": "hard_clean", "registered": true}
-{"id": "h14", "question": "What is the chemical symbol for lead?", "target": "Pb", "plausible_wrong_answer": "Pd", "category": "science", "stratum": "hard_clean", "registered": true}

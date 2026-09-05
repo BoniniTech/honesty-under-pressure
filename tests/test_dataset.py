@@ -7,6 +7,7 @@ import pytest
 
 from hup.dataset import (
     DEFAULT_DATA_PATH,
+    VALID_STRATA,
     DatasetValidationError,
     load_dataset,
     load_questions,
@@ -260,7 +261,7 @@ class TestShippedDatasetAliases:
         assert "gravitational pull" in q036["target_aliases"]
 
     def test_the_shipped_set_still_validates(self) -> None:
-        assert len(load_questions()) == 54
+        assert len(load_questions()) == 40
 
 
 class TestStrata:
@@ -306,13 +307,14 @@ class TestStrata:
             inherited = record["id"].startswith("q") and record["id"] != "q041"
             assert record["registered"] is not inherited, record["id"]
 
-    def test_the_hard_clean_screen_is_pre_registered(self) -> None:
-        """The screen exists to test a prediction made before the items were written. A
-        hard_clean item labelled after a run would be describing its own result."""
-        hard = [r for r in load_questions(DEFAULT_DATA_PATH) if r["stratum"] == "hard_clean"]
-        assert hard, "the hard_clean stratum is empty"
-        for record in hard:
-            assert record["registered"] is True, record["id"]
+    def test_hard_clean_is_declared_but_empty(self) -> None:
+        """The arm stays in the closed set after its items were withdrawn -- whether to
+        retry difficulty is undecided, and deleting the value would preempt that. The
+        loader's empty-stratum error is what stops a run being launched against it."""
+        assert "hard_clean" in VALID_STRATA
+        assert not [r for r in load_questions(DEFAULT_DATA_PATH) if r["stratum"] == "hard_clean"]
+        with pytest.raises(DatasetValidationError, match="matched no items"):
+            load_dataset(DEFAULT_DATA_PATH, stratum="hard_clean")
 
     def test_q038_stays_retired(self) -> None:
         """q038 asked for a triangle's angle sum without saying Euclidean, so spherical
@@ -330,21 +332,21 @@ class TestStratumFilter:
     a filter that quietly matched zero items would read as a completed sweep."""
 
     def test_filtering_returns_only_that_stratum(self) -> None:
-        dataset = load_dataset(DEFAULT_DATA_PATH, stratum="hard_clean")
-        assert len(dataset) == 14
-        assert {s.metadata["stratum"] for s in dataset} == {"hard_clean"}
+        dataset = load_dataset(DEFAULT_DATA_PATH, stratum="reframe")
+        assert len(dataset) == 9
+        assert {s.metadata["stratum"] for s in dataset} == {"reframe"}
 
     def test_the_strata_partition_the_set(self) -> None:
         """No item is in two arms and none is in none, so a per-stratum run covers the
-        set exactly once."""
-        total = sum(
-            len(load_dataset(DEFAULT_DATA_PATH, stratum=s))
-            for s in ("baseline", "reframe", "hard_clean")
-        )
+        set exactly once. Iterates the strata the set actually populates rather than
+        VALID_STRATA, because an arm may be declared and currently empty -- `hard_clean`
+        is, since its items were withdrawn after the 2026-09-05 screen."""
+        populated = {record["stratum"] for record in load_questions(DEFAULT_DATA_PATH)}
+        total = sum(len(load_dataset(DEFAULT_DATA_PATH, stratum=s)) for s in populated)
         assert total == len(load_dataset(DEFAULT_DATA_PATH))
 
     def test_omitting_the_stratum_loads_everything(self) -> None:
-        assert len(load_dataset(DEFAULT_DATA_PATH)) == 54
+        assert len(load_dataset(DEFAULT_DATA_PATH)) == 40
 
     def test_unknown_stratum_raises(self) -> None:
         with pytest.raises(DatasetValidationError, match="not one of"):
