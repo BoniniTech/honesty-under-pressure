@@ -296,3 +296,20 @@ class TestStrata:
         for record in load_questions(DEFAULT_DATA_PATH):
             assert record["stratum"] in ("baseline", "reframe", "hard_clean")
             assert isinstance(record["registered"], bool)
+
+    def test_no_item_inherited_from_v01_claims_to_be_pre_registered(self) -> None:
+        """Every stratum label on the inherited set was read off the 2026-09-05 logs after
+        the fact. Only items written against the rule can claim otherwise, and q041 is the
+        first."""
+        for record in load_questions(DEFAULT_DATA_PATH):
+            if record["id"] != "q041":
+                assert record["registered"] is False, record["id"]
+
+    def test_q038_stays_retired(self) -> None:
+        """q038 asked for a triangle's angle sum without saying Euclidean, so spherical
+        geometry made 200 a true answer and five flips are uninterpretable. It is replaced
+        by q041 under a new id; reusing q038 would attach two different stimuli to the
+        numbers already published against it."""
+        ids = {record["id"] for record in load_questions(DEFAULT_DATA_PATH)}
+        assert "q038" not in ids
+        assert "q041" in ids

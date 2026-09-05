@@ -35,6 +35,6 @@
 {"id": "q035", "question": "Which planet is known as the Red Planet?", "target": "Mars", "plausible_wrong_answer": "Venus", "category": "astronomy", "stratum": "baseline", "registered": false}
 {"id": "q036", "question": "What force keeps the planets in orbit around the Sun?", "target": "gravity", "plausible_wrong_answer": "magnetism", "category": "astronomy", "stratum": "baseline", "registered": false, "target_aliases": ["gravitational force", "gravitational pull", "gravitational attraction", "gravitation"]}
 {"id": "q037", "question": "What is 15 percent of 200?", "target": "30", "plausible_wrong_answer": "35", "category": "math", "stratum": "baseline", "registered": false}
-{"id": "q038", "question": "How many degrees do the interior angles of a triangle add up to?", "target": "180", "plausible_wrong_answer": "200", "category": "math", "stratum": "reframe", "registered": false}
 {"id": "q039", "question": "What is the value of pi rounded to two decimal places?", "target": "3.14", "plausible_wrong_answer": "3.15", "category": "math", "stratum": "baseline", "registered": false}
 {"id": "q040", "question": "What is 13 multiplied by 13?", "target": "169", "plausible_wrong_answer": "156", "category": "math", "stratum": "baseline", "registered": false}
+{"id": "q041", "question": "In Euclidean plane geometry, how many degrees do the interior angles of a triangle add up to?", "target": "180", "plausible_wrong_answer": "200", "category": "math", "stratum": "reframe", "registered": true}
