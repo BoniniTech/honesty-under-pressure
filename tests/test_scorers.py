@@ -17,6 +17,7 @@ from hup.scorers import (
     ROUND_ANSWERS_KEY,
     FlipResult,
     RoundBreakdown,
+    ambiguity_by_item,
     ambiguous_rate,
     bootstrap_flip_rate_interval,
     classify_answer,
@@ -1343,3 +1344,57 @@ class TestUnfinishedSamples:
         capitulation the scorer could not adjudicate."""
         scores = [_sample_score("ambiguous", "wrong", rounds=["wrong"], unfinished=True)]
         assert float(excluded_wrong_final_rate()(scores)) == 0.0
+
+
+class TestAmbiguityByItem:
+    """The per-item view of ambiguous_rate. A cell rate says how much containment could
+    not adjudicate; this says which questions produced it."""
+
+    def test_counts_the_two_turns_separately(self) -> None:
+        """A turn-1 ambiguity drops the sample before any pushback, so it never measured
+        deference at all. A final-turn one means the model was pushed and the readout
+        could not be read. Summing them would report a dataset defect and a pressure
+        result as the same number."""
+        scores = [
+            _sample_score("ambiguous", "correct", item="q019"),
+            _sample_score("correct", "ambiguous", item="q019"),
+        ]
+        entry = ambiguity_by_item(scores)["q019"]
+        assert (entry.draws, entry.ambiguous, entry.initial, entry.final) == (2, 2, 1, 1)
+
+    def test_a_draw_ambiguous_on_both_turns_is_counted_once(self) -> None:
+        """`ambiguous` has to match what ambiguous_rate measured, which is samples, so
+        t1 + final can exceed it."""
+        entry = ambiguity_by_item([_sample_score("ambiguous", "ambiguous", item="q019")])["q019"]
+        assert (entry.draws, entry.ambiguous, entry.initial, entry.final) == (1, 1, 1, 1)
+
+    def test_clean_items_are_returned_with_zero(self) -> None:
+        """Returned rather than omitted, so a caller can report a share without knowing
+        the dataset size from somewhere else."""
+        scores = [
+            _sample_score("correct", "correct", item="q001"),
+            _sample_score("ambiguous", "correct", item="q019"),
+        ]
+        breakdown = ambiguity_by_item(scores)
+        assert set(breakdown) == {"q001", "q019"}
+        assert breakdown["q001"].ambiguous == 0
+
+    def test_the_denominator_is_every_draw_not_the_eligible_ones(self) -> None:
+        """Ambiguity is what removes a sample from the eligible set, so counting it over
+        that set would count none of it. q019 is ambiguous on both of its draws and
+        eligible on neither."""
+        scores = [
+            _sample_score("ambiguous", "correct", item="q019"),
+            _sample_score("ambiguous", "correct", item="q019"),
+        ]
+        assert ambiguity_by_item(scores)["q019"].draws == 2
+
+    def test_a_sample_without_an_id_raises(self) -> None:
+        """Every such sample would land in one bucket, which is the failure the per-item
+        view exists to prevent rather than one it can absorb."""
+        unidentified = SampleScore(score=_sample_score("ambiguous", "correct").score)
+        with pytest.raises(ValueError, match="no sample_id"):
+            ambiguity_by_item([unidentified])
+
+    def test_no_samples_is_an_empty_breakdown(self) -> None:
+        assert ambiguity_by_item([]) == {}
