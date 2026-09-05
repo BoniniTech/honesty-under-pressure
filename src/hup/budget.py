@@ -38,32 +38,53 @@ from hup.dataset import DEFAULT_DATA_PATH, load_questions
 from hup.solvers import DEFAULT_ROUNDS, PressureCondition, turns_per_sample, validate_rounds
 from hup.task import DEFAULT_MAX_TOKENS, DEFAULT_TOKEN_LIMIT
 
-# Mean total tokens per sample, all three turns summed, measured over the complete
-# 120-sample-per-model pass of 2026-08-19 — the whole 40-question set under all three
-# conditions. Raw .eval logs are gitignored, which is why these are recorded constants
-# rather than recomputed here.
+# Mean total tokens per sample, every turn summed, keyed by the escalation depth the
+# run was made at and then by model. Raw .eval logs are gitignored, which is why these
+# are recorded constants rather than recomputed here.
 #
-# These replace figures taken from the 2026-08-12 pilot, which ran ten questions. Two
-# barely moved (haiku 512 to 511, gpt-4o-mini 360 to 367) and gemini-3.6-flash rose 9.3%,
-# from 2,047 to 2,238. Ten questions were enough for the cheap models and not for the
-# expensive one, which is the model whose share of a sweep the estimate most needs right.
+# Keyed by depth because the depth is not a multiplier on a single table. Measured, a
+# three-round sample costs 3.4x to 3.9x its one-round self across the four v0.2 models,
+# where the ratio of turn counts predicts 1.67x — every turn re-sends the whole
+# conversation, so input grows far faster than the turn count. A single table plus
+# arithmetic understated the ladder by about 2.2x, and `round_scale` still carries that
+# error wherever a depth has no measurement of its own.
+#
+# Depth 1, v0.1 slate: the complete 120-sample-per-model pass of 2026-08-19. These
+# replaced figures from the 2026-08-12 pilot, which ran ten questions. Two barely moved
+# (haiku 512 to 511, gpt-4o-mini 360 to 367) and gemini-3.6-flash rose 9.3%, from 2,047
+# to 2,238. Ten questions were enough for the cheap models and not for the expensive one,
+# which is the model whose share of a sweep the estimate most needs right.
+#
+# Depths 1 and 3, v0.2 slate: the two-pass build-out of 2026-09-04, 240 samples per model
+# per arm, `runs/summaries/buildout-2026-09-04.md`. Recomputed from the logs rather than
+# copied from that file's spend table.
 #
 # Mean, not median. A total is n x mean by definition, and these distributions are
 # right-skewed enough that the difference is not cosmetic: an earlier revision of this
 # module projected from a single pooled median of 536 and reported 192,960 tokens for a
 # sweep whose measured figure is 350,328, an 82% understatement. Pooling models with
-# means from 367 to 2,238 into one median made it worse still.
-OBSERVED_MEAN_TOKENS_PER_SAMPLE: dict[str, int] = {
-    "openai/gpt-4o-mini-2024-07-18": 367,
-    "anthropic/claude-haiku-4-5-20251001": 511,
-    "google/gemini-3.6-flash": 2_238,
+# means from 339 to 6,902 into one median made it worse still.
+OBSERVED_MEAN_TOKENS_PER_SAMPLE: dict[int, dict[str, int]] = {
+    1: {
+        "openai/gpt-4o-mini-2024-07-18": 367,
+        "anthropic/claude-haiku-4-5-20251001": 519,
+        "google/gemini-3.6-flash": 2_238,
+        "openai/gpt-5.6-terra": 339,
+        "anthropic/claude-sonnet-5": 1_525,
+        "google/gemini-3.8-flash": 1_898,
+    },
+    3: {
+        "openai/gpt-5.6-terra": 1_240,
+        "anthropic/claude-haiku-4-5-20251001": 2_012,
+        "anthropic/claude-sonnet-5": 5_177,
+        "google/gemini-3.8-flash": 6_902,
+    },
 }
 
-# The escalation depth those means were measured at. Every recorded figure above comes
-# from a one-round run, so a projection at a different depth is arithmetic rather than a
-# measurement, and `format_estimate` says so in the output instead of leaving the reader
-# to notice. See `round_scale` for why the arithmetic errs low.
-OBSERVED_MEAN_ROUNDS = 1
+# haiku is in the depth-1 table twice over: 511 from the 2026-08-19 full run and 519 from
+# the 2026-09-04 build-out. The later figure is the one recorded, because it was produced
+# by the build the v0.2 run will use. The 1.6% gap between them is the size of the noise
+# on a 240-sample mean, and is worth knowing before reading any of these to three digits.
 
 # Model ids here are pinned versions, never floating aliases, and that is a correctness
 # requirement rather than a style preference. The pilot ran `google/gemini-flash-latest`,
@@ -73,12 +94,37 @@ OBSERVED_MEAN_ROUNDS = 1
 #
 # `gpt-4o-mini` is the same hazard wearing a less obvious name. It resolved to
 # `gpt-4o-mini-2024-07-18` on both dates, so it had not moved yet, but nothing stops it.
-# All three ids here were run on 2026-08-19 and each resolved to itself.
+# All three ids there were run on 2026-08-19 and each resolved to itself.
 
-# An unmeasured model is assumed to behave like the most expensive one measured. Guessing
-# low here produces a budget that is approved and then exceeded, which is the failure this
-# module exists to prevent; guessing high produces a conversation.
-UNMEASURED_MEAN_TOKENS_PER_SAMPLE = max(OBSERVED_MEAN_TOKENS_PER_SAMPLE.values())
+
+def nearest_measured_depth(rounds: int, model: str | None = None) -> int:
+    """The measured depth a projection for `rounds` should be built from.
+
+    Exact match wins. Otherwise the closest measured depth, and on a tie the deeper one:
+    scaling down from a deeper measurement by the turn ratio overstates, and scaling up
+    from a shallower one understates, so the tie breaks toward the safe direction.
+
+    `model` restricts the search to depths that measured that model. Left as None it
+    considers every depth that measured anything, which is what an unmeasured model's
+    stand-in needs.
+    """
+    depths = [
+        depth
+        for depth, means in OBSERVED_MEAN_TOKENS_PER_SAMPLE.items()
+        if model is None or model in means
+    ]
+    if not depths:
+        raise ValueError(f"no depth in the table measured {model!r}")
+    return min(depths, key=lambda depth: (abs(depth - rounds), -depth))
+
+
+# An unmeasured model is assumed to behave like the most expensive one measured at the
+# depth its projection is built from. Guessing low here produces a budget that is approved
+# and then exceeded, which is the failure this module exists to prevent; guessing high
+# produces a conversation.
+def unmeasured_mean_tokens_per_sample(rounds: int) -> int:
+    depth = nearest_measured_depth(rounds)
+    return max(OBSERVED_MEAN_TOKENS_PER_SAMPLE[depth].values())
 
 
 @dataclass(frozen=True)
@@ -93,29 +139,39 @@ class SweepEstimate:
     token_limit: int
     max_tokens: int
     mean_tokens_by_model: dict[str, int]
+    measured_depth_by_model: dict[str, int]
 
     @property
     def turns(self) -> int:
         """Assistant turns per sample at this depth: the answer, the rounds, the readout."""
         return turns_per_sample(self.rounds)
 
-    @property
-    def round_scale(self) -> float:
-        """Factor applied to the measured means to project a deeper ladder.
+    def round_scale_for(self, model: str) -> float:
+        """Factor applied to one model's measured mean to project this depth.
 
-        The ratio of turn counts, and nothing better is available until a run at this
-        depth is measured. It errs low, which is the direction this module exists to
-        avoid: every turn re-sends the whole conversation so far, so input tokens grow
-        faster than the turn count while output per turn stays roughly flat. Treat a
-        projection at an unmeasured depth as a floor, not an estimate, and replace the
-        table above with real figures once a run at that depth exists.
+        1.0 where the depth was measured, which is the whole point of keying the table
+        by depth. Otherwise the ratio of turn counts, which is arithmetic rather than a
+        measurement: every turn re-sends the whole conversation so far, so real cost
+        grows faster than the turn count while output per turn stays roughly flat.
+        Measured between one round and three on the v0.2 slate the real factor was 3.4x
+        to 3.9x where this ratio gives 1.67x, about 2.2x out.
+
+        Which way it is wrong depends on the direction. Scaling UP from a shallower
+        measurement understates, so the row is a floor. Scaling DOWN from a deeper one
+        overstates, so the row is a ceiling. Measure a short pass at the depth and add it
+        to the table instead of leaning on either.
         """
-        return self.turns / turns_per_sample(OBSERVED_MEAN_ROUNDS)
+        return self.turns / turns_per_sample(self.measured_depth_by_model[model])
+
+    @property
+    def scaled_models(self) -> tuple[str, ...]:
+        """Models whose projection is arithmetic off a depth they were not measured at."""
+        return tuple(m for m in self.models if self.measured_depth_by_model[m] != self.rounds)
 
     @property
     def scaled_rounds(self) -> bool:
-        """Whether the projection is arithmetic off a depth nothing was measured at."""
-        return self.rounds != OBSERVED_MEAN_ROUNDS
+        """Whether any row in the projection is scaled rather than measured at this depth."""
+        return bool(self.scaled_models)
 
     @property
     def samples_per_pass(self) -> int:
@@ -131,12 +187,13 @@ class SweepEstimate:
 
     @property
     def unmeasured_models(self) -> tuple[str, ...]:
-        """Models with no recorded mean, whose share of the estimate is a stand-in."""
-        return tuple(m for m in self.models if m not in OBSERVED_MEAN_TOKENS_PER_SAMPLE)
+        """Models with no recorded mean at any depth, whose share is a stand-in."""
+        measured = {model for means in OBSERVED_MEAN_TOKENS_PER_SAMPLE.values() for model in means}
+        return tuple(m for m in self.models if m not in measured)
 
     def observed_tokens_for(self, model: str) -> int:
         """Projected spend for one model across every question, condition and pass."""
-        per_sample = self.mean_tokens_by_model[model] * self.round_scale
+        per_sample = self.mean_tokens_by_model[model] * self.round_scale_for(model)
         return round(self.questions * self.conditions * self.passes * per_sample)
 
     @property
@@ -214,10 +271,25 @@ def estimate_sweep(
         rounds=rounds,
         token_limit=token_limit,
         max_tokens=max_tokens,
-        mean_tokens_by_model={
-            model: OBSERVED_MEAN_TOKENS_PER_SAMPLE.get(model, UNMEASURED_MEAN_TOKENS_PER_SAMPLE)
-            for model in models
-        },
+        mean_tokens_by_model={model: _mean_for(model, rounds) for model in models},
+        measured_depth_by_model={model: _depth_for(model, rounds) for model in models},
+    )
+
+
+def _depth_for(model: str, rounds: int) -> int:
+    """The measured depth this model's projection is built from.
+
+    An unmeasured model borrows the depth its stand-in rate came from, so its row is
+    scaled by the same factor as a measured model would be.
+    """
+    measured = {m for means in OBSERVED_MEAN_TOKENS_PER_SAMPLE.values() for m in means}
+    return nearest_measured_depth(rounds, model if model in measured else None)
+
+
+def _mean_for(model: str, rounds: int) -> int:
+    depth = _depth_for(model, rounds)
+    return OBSERVED_MEAN_TOKENS_PER_SAMPLE[depth].get(
+        model, unmeasured_mean_tokens_per_sample(rounds)
     )
 
 
@@ -238,7 +310,14 @@ def format_estimate(estimate: SweepEstimate) -> str:
 
     for model in estimate.models:
         mean = estimate.mean_tokens_by_model[model]
-        marker = "  <- no measurement, assumed" if model in estimate.unmeasured_models else ""
+        depth = estimate.measured_depth_by_model[model]
+        plural = "" if depth == 1 else "s"
+        if model in estimate.unmeasured_models:
+            marker = f"  <- no measurement, assumed (from {depth} round{plural})"
+        elif model in estimate.scaled_models:
+            marker = f"  <- SCALED from {depth} round{plural}"
+        else:
+            marker = f"  <- measured at {depth} round{plural}"
         lines.append(
             f"  {model:<{width}}  {estimate.observed_tokens_for(model):>10,}"
             f"  (at {mean:,}/sample){marker}"
@@ -262,23 +341,34 @@ def format_estimate(estimate: SweepEstimate) -> str:
     ]
 
     if estimate.unmeasured_models:
+        rounds_plural = "" if estimate.rounds == 1 else "s"
         lines += [
             "",
-            "Models marked above have no measured mean and are projected at the highest",
-            f"observed rate ({UNMEASURED_MEAN_TOKENS_PER_SAMPLE:,}/sample). Run a small pass and",
-            "record the real figure before treating their share of this number as tight.",
+            "Models marked `no measurement` have no recorded mean at any depth and are",
+            f"projected at the highest rate measured at {estimate.rounds} "
+            f"round{rounds_plural} "
+            f"({unmeasured_mean_tokens_per_sample(estimate.rounds):,}/sample). Run a small",
+            "pass and record the real figure before treating their share as tight.",
         ]
 
-    if estimate.scaled_rounds:
-        measured = f"{OBSERVED_MEAN_ROUNDS} round" + ("" if OBSERVED_MEAN_ROUNDS == 1 else "s")
+    if estimate.scaled_models:
         lines += [
             "",
-            f"Every mean above was measured at {measured} of pushback and scaled by"
-            f" {estimate.round_scale:.2f}x",
-            f"for {estimate.rounds}. That is the ratio of turn counts, not a measurement, and it",
-            "errs LOW: every turn re-sends the conversation so far, so input grows faster than",
-            "the turn count does. Read the projection as a floor, and measure a short pass at",
-            "this depth before approving a full run.",
+            "Models marked SCALED were measured at a different depth and multiplied by the",
+            "ratio of turn counts to reach this one. That ratio is arithmetic, not a",
+            "measurement: every turn re-sends the conversation so far, so real cost grows",
+            "faster than the turn count does. Measured between one round and three on the",
+            "v0.2 slate the real factor was 3.4x to 3.9x where the ratio gives 1.67x, about",
+            "2.2x out. Scaling UP therefore understates, so the row is a floor; scaling DOWN",
+            "overstates, so the row is a ceiling. Measure a short pass at this depth before",
+            "approving a full run.",
+        ]
+        lines += [
+            f"  {model}: x{estimate.round_scale_for(model):.2f} from "
+            f"{estimate.measured_depth_by_model[model]} round"
+            f"{'' if estimate.measured_depth_by_model[model] == 1 else 's'}"
+            f" ({'floor' if estimate.round_scale_for(model) > 1 else 'ceiling'})"
+            for model in estimate.scaled_models
         ]
 
     return "\n".join(lines)
