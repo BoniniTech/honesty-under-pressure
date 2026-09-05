@@ -122,6 +122,49 @@ Milestones carry release scope: `v0.1` for the frozen scope in this file, `v0.2`
 
 The label set is closed. Adding one is a deliberate decision and ships with the edit to this section, under the same-PR rule above.
 
+### Releases
+
+Every tag from `v0.2` onward ships a GitHub Release carrying the run's report as an asset named **`report.md`**, plus the two figures. That gives two URL shapes, and the second is the point of the whole arrangement:
+
+```
+https://github.com/BoniniTech/honesty-under-pressure/releases/download/<tag>/report.md
+https://github.com/BoniniTech/honesty-under-pressure/releases/latest/download/report.md
+```
+
+The asset is named `report.md` and not `latest-report.md` because "latest" belongs to the URL path — `releases/download/v0.2/latest-report.md` would name v0.2's report as though it were the newest one.
+
+**A tag without a release is a defect, not an omission.** `releases/latest/download/report.md` keeps serving the previous release's report until a new release exists, so a missed one leaves a URL that looks current and is not. That is worse than having no such URL. Tag and release together, in the same session.
+
+`report.md` is the run summary with its two image links rewritten, and nothing else. The in-tree copy uses `../../analysis/*.svg`, which resolves in the repo and is dead in a downloaded file, so the asset copy points at the figures attached to that same release — pinned to the tag, never to `latest`, so each report shows the figures from its own run however it was fetched. Generate it at release time rather than keeping a second copy in the tree:
+
+```bash
+python - <<'EOF'
+import pathlib
+base = "https://github.com/BoniniTech/honesty-under-pressure/releases/download/<tag>"
+t = pathlib.Path("runs/summaries/<run>.md").read_text(encoding="utf-8")
+for name in ("per-item.svg", "flip-rate.svg"):
+    t = t.replace(f"](../../analysis/{name})", f"]({base}/{name})")
+assert "../../analysis/" not in t
+pathlib.Path("report.md").write_text(t, encoding="utf-8", newline="")
+EOF
+
+# Title and notes come from the annotated tag, extracted with shell redirection.
+# Never route them through Python's subprocess text decoding: on Windows that decodes
+# git's UTF-8 output with the locale codec, and the em-dash in every tag title here
+# lands in the release as "â€”". Hit on the v0.2 release, 2026-09-05.
+git tag -l --format='%(contents)' <tag> > tagmsg.txt
+head -1 tagmsg.txt > title.txt
+tail -n +3 tagmsg.txt > notes.md
+
+gh release create <tag> --title "$(cat title.txt)" --notes-file notes.md --verify-tag   report.md analysis/per-item.svg analysis/flip-rate.svg
+```
+
+`newline=""` keeps the asset on LF endings, so it differs from the in-tree file by exactly the two rewritten lines rather than by every line.
+
+**Read the release title back after creating it.** `gh release view <tag> --json name --jq '.name' | od -c` should show `342 200 224` where the dash is; anything else means an encoding step corrupted it. The assets are unaffected by that failure, because they are read and written with an explicit encoding, so a corrupted title does not imply a corrupted report.
+
+**While the repo is private these URLs return `Not Found` to anyone unauthenticated, including you in a plain `curl`.** That is repo visibility, not a broken release: verified on 2026-09-05 that `gh release download` returns the asset byte-identical to what was uploaded and that the `latest` alias resolves. Re-verify the unauthenticated URL at publication, together with the ruleset check that fires at the same moment. Do not "fix" a 404 before then.
+
 The rest of the conventions differ by surface:
 
 ### Cloud/remote sessions (Claude Code Remote)
