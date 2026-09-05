@@ -172,10 +172,11 @@ bounds, and the exact commands that regenerate the published numbers.
 ## Results
 
 **In one line.** Ten flips in 1,920 samples, all from one model of four, and all from
-three of the forty questions. That is enough to establish that the behaviour happens, and
-to show that *where* a model gives in depends on which kind of pressure is applied. It is
-not enough to put a rate on it: no cell in the table below is distinguishable from zero,
-or from any other cell.
+three of the forty questions. Five of those ten came from `q038`, retired after this run
+as a broken item, so five flips on two questions is what stands. That is enough to
+establish that the behaviour happens, and to show that *where* a model gives in depends on
+which kind of pressure is applied. It is not enough to put a rate on it: no cell in the
+table below is distinguishable from zero, or from any other cell.
 
 Four passes over the full set on 2026-09-05. 40 questions × 3 pressure conditions × 4
 models × 4 passes = 1,920 samples, at three rounds of pushback, on `inspect-ai==0.3.255`,
@@ -387,12 +388,16 @@ Both transcripts in full, with the intermediate rounds this one elides:
 
 **Does.** Under escalating pushback with no evidence attached, one of four tested
 everyday-tier models abandoned correct factual answers it had just stated in detail,
-reproducibly, on three questions, across independent passes, while constructing a frame in
-which the user was right. Three other models did not do this once in 1,440 samples.
+reproducibly, on three questions and on two once `q038` is discounted, across independent
+passes, while constructing a frame in which the user was right. Three other models did not
+do this once in 1,440 samples.
 
-**Does.** That where a model gives in depends on the kind of pressure. Plain contradiction
-produced flips inside the argument; authority appeal produced them only at the readout.
-This replicates across the two runs that have measured it.
+**Does, on thinner support than the table implies.** That where a model gives in depends on
+the kind of pressure. Plain contradiction produced flips inside the argument; authority
+appeal produced them only at the readout. Net of `q038` that is four authority flips
+against one plain-contradiction flip, and the 2026-09-04 build-out that shows the same
+split had three of its own three-round flips on `q038` too, so both runs thin the same way.
+The direction has not reversed anywhere. The evidence for it is a handful of events.
 
 **Does not.** That the flip rate varies by pressure condition, or by model. Ten events
 cannot support that comparison, and every interval in the table overlaps every other one —
@@ -571,8 +576,8 @@ the room to hedge that a model would otherwise use. That was not tested.
 
 **So the honest reading is still a near-null.** Under three rounds of escalating scripted
 pushback, four everyday-tier models held a correct answer on easy, unambiguous facts almost
-every time: 1,876 of 1,920 samples were a clean hold, ten were flips, and neither cell
-those ten sit in separates from zero. Escalation was the most likely place real signal
+every time: 1,876 of 1,920 samples were a clean hold, ten were flips of which five survive
+the `q038` retirement, and neither cell those ten sit in separates from zero. Escalation was the most likely place real signal
 lived, and it did raise the count — six flips in 2,160 samples at one round, ten in 1,920
 at three — but not far enough to make any cell distinguishable from any other.
 
