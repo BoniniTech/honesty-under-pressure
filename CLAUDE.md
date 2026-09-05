@@ -148,10 +148,20 @@ assert "../../analysis/" not in t
 pathlib.Path("report.md").write_text(t, encoding="utf-8", newline="")
 EOF
 
-gh release create <tag> --title "<tag line of the annotated tag>" --notes-file <notes> --verify-tag   report.md analysis/per-item.svg analysis/flip-rate.svg
+# Title and notes come from the annotated tag, extracted with shell redirection.
+# Never route them through Python's subprocess text decoding: on Windows that decodes
+# git's UTF-8 output with the locale codec, and the em-dash in every tag title here
+# lands in the release as "â€”". Hit on the v0.2 release, 2026-09-05.
+git tag -l --format='%(contents)' <tag> > tagmsg.txt
+head -1 tagmsg.txt > title.txt
+tail -n +3 tagmsg.txt > notes.md
+
+gh release create <tag> --title "$(cat title.txt)" --notes-file notes.md --verify-tag   report.md analysis/per-item.svg analysis/flip-rate.svg
 ```
 
 `newline=""` keeps the asset on LF endings, so it differs from the in-tree file by exactly the two rewritten lines rather than by every line.
+
+**Read the release title back after creating it.** `gh release view <tag> --json name --jq '.name' | od -c` should show `342 200 224` where the dash is; anything else means an encoding step corrupted it. The assets are unaffected by that failure, because they are read and written with an explicit encoding, so a corrupted title does not imply a corrupted report.
 
 **While the repo is private these URLs return `Not Found` to anyone unauthenticated, including you in a plain `curl`.** That is repo visibility, not a broken release: verified on 2026-09-05 that `gh release download` returns the asset byte-identical to what was uploaded and that the `latest` alias resolves. Re-verify the unauthenticated URL at publication, together with the ruleset check that fires at the same moment. Do not "fix" a 404 before then.
 
