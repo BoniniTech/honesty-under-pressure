@@ -25,13 +25,13 @@ from inspect_ai import eval as inspect_eval
 from inspect_ai.model import ChatMessage, ModelOutput
 
 from hup.budget import (
-    OBSERVED_MEAN_ROUNDS,
     OBSERVED_MEAN_TOKENS_PER_SAMPLE,
-    UNMEASURED_MEAN_TOKENS_PER_SAMPLE,
     SweepEstimate,
     estimate_sweep,
     format_estimate,
     main,
+    nearest_measured_depth,
+    unmeasured_mean_tokens_per_sample,
 )
 from hup.solvers import (
     DEFAULT_ROUNDS,
@@ -52,14 +52,17 @@ from hup.task import (
 
 _TASKS = (plain_contradiction, authority_appeal, confidence_social)
 
-# Three measured models, so estimates in these tests project from recorded means rather
-# than the unmeasured-model stand-in.
-_MEASURED = tuple(OBSERVED_MEAN_TOKENS_PER_SAMPLE)
+# Models measured at the default depth, so estimates in these tests project from recorded
+# means rather than the unmeasured-model stand-in.
+_MEASURED = tuple(OBSERVED_MEAN_TOKENS_PER_SAMPLE[DEFAULT_ROUNDS])
 
-# A pinned model id carries a date or a dotted version. Shared by both pin tests on
-# purpose: if they held separate copies, weakening one would leave the other guarding
-# nothing.
-_PINNED = re.compile(r"\d{8}|\d{4}-\d{2}-\d{2}|\d+\.\d+")
+# A pinned model id carries a date, a dotted version, or a trailing version number.
+# The third alternative is what Anthropic's 4.6-and-later ids need: `claude-sonnet-5`
+# is the complete id and no dated form exists, so requiring one would reject a correctly
+# pinned model. It costs the check its ability to reject `gpt-4`, which has the same
+# shape and is an alias. Shared by both pin tests on purpose: if they held separate
+# copies, weakening one would leave the other guarding nothing.
+_PINNED = re.compile(r"\d{8}|\d{4}-\d{2}-\d{2}|\d+\.\d+|-\d+$")
 
 
 def _estimate(**kwargs: object) -> SweepEstimate:
@@ -176,7 +179,7 @@ def test_estimate_derives_conditions_from_the_solver(tmp_path: Path) -> None:
 
 def test_sample_and_call_arithmetic(tmp_path: Path) -> None:
     estimate = _estimate(dataset_path=_dataset(tmp_path / "q.jsonl", 10))
-    assert estimate.samples == 10 * estimate.conditions * 3
+    assert estimate.samples == 10 * estimate.conditions * len(_MEASURED)
     assert estimate.generate_calls == estimate.samples * turns_per_sample(estimate.rounds)
 
 
@@ -186,10 +189,11 @@ def _fixed_estimate(**overrides: object) -> SweepEstimate:
         "conditions": 3,
         "models": ("a", "b", "c"),
         "passes": 1,
-        "rounds": OBSERVED_MEAN_ROUNDS,
+        "rounds": 1,
         "token_limit": 10_000,
         "max_tokens": 2_000,
         "mean_tokens_by_model": {"a": 100, "b": 200, "c": 300},
+        "measured_depth_by_model": {"a": 1, "b": 1, "c": 1},
     }
     fields.update(overrides)
     return SweepEstimate(**fields)  # type: ignore[arg-type]
@@ -225,9 +229,18 @@ def test_an_unmeasured_model_is_projected_at_the_highest_observed_rate() -> None
     estimate = estimate_sweep(models=["some/brand-new-model"])
     assert estimate.unmeasured_models == ("some/brand-new-model",)
     assert estimate.mean_tokens_by_model["some/brand-new-model"] == (
-        UNMEASURED_MEAN_TOKENS_PER_SAMPLE
+        unmeasured_mean_tokens_per_sample(DEFAULT_ROUNDS)
     )
-    assert UNMEASURED_MEAN_TOKENS_PER_SAMPLE == max(OBSERVED_MEAN_TOKENS_PER_SAMPLE.values())
+    assert unmeasured_mean_tokens_per_sample(DEFAULT_ROUNDS) == max(
+        OBSERVED_MEAN_TOKENS_PER_SAMPLE[DEFAULT_ROUNDS].values()
+    )
+
+
+def test_the_stand_in_rate_is_taken_at_the_depth_being_projected() -> None:
+    """A one-round stand-in scaled to three rounds would understate by the same 2.2x the
+    turn ratio does. The three-round table has its own maximum, so it is used."""
+    assert unmeasured_mean_tokens_per_sample(3) == max(OBSERVED_MEAN_TOKENS_PER_SAMPLE[3].values())
+    assert unmeasured_mean_tokens_per_sample(3) > unmeasured_mean_tokens_per_sample(1)
 
 
 def test_a_measured_model_is_not_flagged_as_assumed() -> None:
@@ -324,7 +337,8 @@ def test_rounds_default_to_the_shape_the_published_results_used() -> None:
     """The README's reproduction command passes no depth, and the numbers it regenerates
     came from a single round of pushback. A default of anything else would make that
     command quietly describe a different experiment from the one beside it."""
-    assert DEFAULT_ROUNDS == OBSERVED_MEAN_ROUNDS == 1
+    assert DEFAULT_ROUNDS == 1
+    assert DEFAULT_ROUNDS in OBSERVED_MEAN_TOKENS_PER_SAMPLE
     assert _estimate().rounds == DEFAULT_ROUNDS
 
 
@@ -338,18 +352,37 @@ def test_each_round_adds_a_turn_to_every_sample() -> None:
     assert three.samples == one.samples
 
 
-def test_a_deeper_ladder_scales_the_projection_by_turn_count() -> None:
-    """The scale is arithmetic off a one-round measurement, so it is pinned to the ratio
-    it claims to be rather than left to drift into a fudge factor."""
-    estimate = _estimate(rounds=3)
-    assert estimate.round_scale == pytest.approx(5 / 3)
-    assert estimate.observed_case_tokens > _estimate(rounds=1).observed_case_tokens
+def test_a_depth_with_its_own_measurement_is_not_scaled() -> None:
+    """The whole reason the table is keyed by depth. Three rounds cost 3.4x to 3.9x one
+    round measured, against 1.67x from the turn ratio, so scaling a one-round figure
+    there would understate the bill by more than half."""
+    estimate = _estimate(rounds=3, models=["anthropic/claude-sonnet-5"])
+    assert estimate.scaled_models == ()
+    assert estimate.round_scale_for("anthropic/claude-sonnet-5") == 1.0
+    assert estimate.mean_tokens_by_model["anthropic/claude-sonnet-5"] == 5_177
+
+
+def test_an_unmeasured_depth_scales_by_turn_count() -> None:
+    """Pinned to the ratio it claims to be rather than left to drift into a fudge
+    factor. Two rounds is measured nowhere, so it is built from the nearer depth."""
+    estimate = _estimate(rounds=2, models=["anthropic/claude-sonnet-5"])
+    assert estimate.scaled_models == ("anthropic/claude-sonnet-5",)
+    assert estimate.round_scale_for("anthropic/claude-sonnet-5") == pytest.approx(4 / 5)
+
+
+def test_a_tie_between_depths_breaks_toward_the_deeper_one() -> None:
+    """Two rounds is one away from both 1 and 3. Scaling down from the deeper
+    measurement overstates and scaling up from the shallower one understates, so the tie
+    breaks toward the row a reader would over-budget from rather than under-budget."""
+    assert nearest_measured_depth(2) == 3
+    assert nearest_measured_depth(1) == 1
+    assert nearest_measured_depth(3) == 3
 
 
 def test_a_projection_at_the_measured_depth_is_not_scaled() -> None:
-    estimate = _estimate(rounds=OBSERVED_MEAN_ROUNDS)
+    estimate = _estimate(rounds=DEFAULT_ROUNDS)
     assert estimate.scaled_rounds is False
-    assert estimate.round_scale == 1.0
+    assert all(estimate.round_scale_for(model) == 1.0 for model in estimate.models)
 
 
 def test_format_says_when_the_projection_is_arithmetic_rather_than_measured() -> None:
@@ -358,7 +391,8 @@ def test_format_says_when_the_projection_is_arithmetic_rather_than_measured() ->
     told which direction the error runs."""
     text = format_estimate(_estimate(rounds=3))
     assert "1.67x" in text
-    assert "errs LOW" in text
+    assert "Scaling UP therefore understates" in text
+    assert "floor" in text
     assert "floor" in text
 
 
@@ -404,10 +438,18 @@ def test_every_recorded_model_id_is_pinned_to_a_version() -> None:
 
     Checking for the word "latest" is not enough, and that is the point of this shape:
     `openai/gpt-4o-mini` is the same hazard and contains no such marker. It happened not
-    to move, which is luck rather than a guarantee. A pinned id carries either a date or
-    a dotted version, so that is what is required.
+    to move, which is luck rather than a guarantee.
+
+    What this can prove is narrow, and the boundary moved under it. Anthropic dropped
+    date suffixes at 4.6, so `claude-sonnet-5` is a complete id with no dated form on
+    offer, and requiring a date or a dotted version would now reject a correctly pinned
+    model. A trailing version number is therefore accepted, which means the check can no
+    longer tell a complete undated id from a provider alias of the same shape — `gpt-4`
+    would pass. It rejects an id carrying no version at all, and nothing more. The rest
+    of the rule lives where it has to: the run summary records the resolved id read back
+    from the response, alongside the date the run was made.
     """
-    for model in OBSERVED_MEAN_TOKENS_PER_SAMPLE:
+    for model in {m for means in OBSERVED_MEAN_TOKENS_PER_SAMPLE.values() for m in means}:
         assert _PINNED.search(model), (
             f"{model!r} carries no version or date, so it is an alias the provider can "
             "repoint; record the resolved id instead"
@@ -424,10 +466,22 @@ def test_the_pin_check_rejects_the_aliases_that_caused_this(alias: str) -> None:
 
 
 def test_every_recorded_mean_is_positive() -> None:
-    """Sourced from runs/summaries/pilot-2026-08-12.md. A zero would make that model's
-    share of every estimate read as free."""
+    """A zero would make that model's share of every estimate read as free."""
     assert OBSERVED_MEAN_TOKENS_PER_SAMPLE
-    assert all(mean > 0 for mean in OBSERVED_MEAN_TOKENS_PER_SAMPLE.values())
+    for means in OBSERVED_MEAN_TOKENS_PER_SAMPLE.values():
+        assert means
+        assert all(mean > 0 for mean in means.values())
+
+
+def test_a_deeper_measurement_costs_more_than_a_shallower_one() -> None:
+    """Every model measured at both depths grew by more than the 1.67x turn ratio.
+    Recorded as a test because the pair of tables is what replaced that arithmetic, and
+    a transcription slip that inverted one row would restore the understatement."""
+    shallow, deep = OBSERVED_MEAN_TOKENS_PER_SAMPLE[1], OBSERVED_MEAN_TOKENS_PER_SAMPLE[3]
+    both = set(shallow) & set(deep)
+    assert both
+    for model in both:
+        assert deep[model] / shallow[model] > 5 / 3, model
 
 
 def _one_reply(_messages: list[ChatMessage], *_a: object, **_k: object) -> ModelOutput:
