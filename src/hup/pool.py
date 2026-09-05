@@ -30,7 +30,12 @@ from pathlib import Path
 from inspect_ai.log import read_eval_log
 from inspect_ai.scorer import SampleScore, Score, Value
 
-from hup.scorers import METRIC_FACTORIES, flips_by_round, recorded_rounds
+from hup.scorers import (
+    METRIC_FACTORIES,
+    ambiguity_by_item,
+    flips_by_round,
+    recorded_rounds,
+)
 
 
 class PoolingError(RuntimeError):
@@ -246,6 +251,99 @@ def format_round_breakdown(pooled: dict[Cell, PooledCell]) -> list[str]:
     return lines
 
 
+# Draws a model must have taken of an item before "ambiguous every time" says anything.
+# Below this it is a coin: two draws at a 50% per-draw rate come up ambiguous twice a
+# quarter of the time, and the note is meant to point at construction, not at luck.
+_PERSISTENT_MIN_DRAWS = 3
+
+
+def format_ambiguity_breakdown(pooled: dict[Cell, PooledCell]) -> list[str]:
+    """Lines naming which dataset items produced each cell's ambiguity.
+
+    Reported beneath the metric table for the same reason the round breakdown is: it
+    partitions a number the table already gave rather than adding a rate of its own.
+    A per-item metric could not exist anyway — metrics register at import time, and the
+    item set is a run-time property of whichever dataset was loaded.
+
+    Only items that produced an ambiguous turn get a row. Forty rows per cell would bury
+    the handful that matter, and the count of clean items is printed instead so their
+    absence is stated rather than inferred from a short table.
+    """
+    breakdowns = {cell: ambiguity_by_item(entry.scores) for cell, entry in pooled.items()}
+
+    rows = [
+        (cell, item, entry)
+        for cell, breakdown in sorted(breakdowns.items(), key=lambda pair: str(pair[0]))
+        for item, entry in breakdown.items()
+        if entry.ambiguous
+    ]
+    items = {item for breakdown in breakdowns.values() for item in breakdown}
+    dirty = {item for _, item, _ in rows}
+
+    if not rows:
+        return [
+            "",
+            f"ambiguity by item: none. All {len(items)} items named exactly one candidate,",
+            "or neither, on both scored turns in every cell.",
+        ]
+
+    width = max(max(len(str(cell)) for cell, _, _ in rows), len("cell"))
+    item_width = max(max(len(item) for _, item, _ in rows), len("item"))
+    header = (
+        f"{'cell':<{width}}  {'item':<{item_width}} {'draws':>5} "
+        f"{'ambig':>5} {'t1':>5} {'final':>5}"
+    )
+    lines = ["", "ambiguity by item, over every sample in the cell:", "", header]
+    lines.append("-" * len(header))
+    for cell, item, entry in rows:
+        lines.append(
+            f"{str(cell):<{width}}  {item:<{item_width}} {entry.draws:>5} "
+            f"{entry.ambiguous:>5} {entry.initial:>5} {entry.final:>5}"
+        )
+
+    lines += [
+        "",
+        "ambig=draws where a scored turn named both candidates, the per-item view of",
+        "  ambiguous_rate  t1=turn 1 did, so the sample was dropped before any pushback",
+        "  was applied  final=the readout did, so the model was pushed and the answer",
+        "  could not be adjudicated. A draw can be both, so t1+final may exceed ambig.",
+        f"{len(items) - len(dirty)} of {len(items)} items were clean in every cell "
+        "and are omitted.",
+    ]
+
+    # An item ambiguous on every draw is ambiguous by construction rather than by chance,
+    # and that is a dataset defect rather than a model result: its distractor is a member
+    # of a set the correct answer invites listing (issue #47). Calling it out is what makes
+    # the next one findable without re-reading transcripts.
+    #
+    # Aggregated across conditions, unlike the table above. Turn 1 asks the same question
+    # in all three conditions, so condition is noise for the ambiguity that matters here
+    # and the unit is the model. Three separate 2/2 cells are what a coin produces; one
+    # 6/6 model is not.
+    per_model: dict[tuple[str, str], list[int]] = {}
+    for cell, breakdown in breakdowns.items():
+        for item, entry in breakdown.items():
+            totals = per_model.setdefault((cell.model, item), [0, 0])
+            totals[0] += entry.draws
+            totals[1] += entry.ambiguous
+    persistent = [
+        (model, item, drawn)
+        for (model, item), (drawn, ambiguous) in sorted(per_model.items())
+        if drawn >= _PERSISTENT_MIN_DRAWS and ambiguous == drawn
+    ]
+    if persistent:
+        lines += [
+            "",
+            "NOTE: these items were ambiguous on EVERY draw the model took of them, across",
+            "all conditions, which is a property of the item rather than of the model. Check",
+            "the distractor against the rule in data/README.md before reading the cell's",
+            "flip rate as a measurement.",
+        ]
+        lines += [f"  {model}: {item} ({drawn}/{drawn} draws)" for model, item, drawn in persistent]
+
+    return lines
+
+
 def format_pooled(pooled: dict[Cell, PooledCell]) -> str:
     names = list(METRIC_FACTORIES)
     missing = [name for name in names if name not in _ABBREVIATIONS]
@@ -278,6 +376,7 @@ def format_pooled(pooled: dict[Cell, PooledCell]) -> str:
     lines.append("")
     lines.append("  ".join(f"{_ABBREVIATIONS[name]}={name}" for name in names))
     lines += format_round_breakdown(pooled)
+    lines += format_ambiguity_breakdown(pooled)
 
     uneven = uneven_cells(pooled)
     if uneven:

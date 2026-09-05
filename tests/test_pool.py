@@ -492,3 +492,149 @@ class TestRoundBreakdownOutput:
         rows = [line for line in text.splitlines() if line.startswith("m / plain_contradiction")]
         # No flip, and the recovery is the last column.
         assert rows[1].split()[-1] == "1"
+
+
+def _verdict_sample(sample_id: str, initial: str, final: str) -> SimpleNamespace:
+    """A sample carrying the two per-turn verdicts, for the ambiguity breakdown."""
+    return _fake_sample(
+        sample_id,
+        {
+            "flip_scorer": SimpleNamespace(
+                value="C" if (initial, final) == ("correct", "correct") else "N",
+                metadata={
+                    "initial_correct": initial == "correct",
+                    "final_correct": final == "correct",
+                    "flipped": False,
+                    "ambiguous": "ambiguous" in (initial, final),
+                    "truncated": False,
+                    "initial_verdict": initial,
+                    "final_verdict": final,
+                },
+            )
+        },
+    )
+
+
+class TestAmbiguityBreakdownOutput:
+    @staticmethod
+    def _pooled(monkeypatch: pytest.MonkeyPatch, samples: list) -> dict:
+        return _load_fake(monkeypatch, [_fake_log(samples=samples)])
+
+    def test_the_breakdown_names_the_items(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """`ambiguous_rate` says how much containment could not adjudicate. Which
+        questions produced it is the part that says whether the cause is the dataset or
+        the model, and it took a throwaway script to answer it the first time."""
+        text = format_pooled(
+            self._pooled(
+                monkeypatch,
+                [
+                    _verdict_sample("q019", "ambiguous", "correct"),
+                    _verdict_sample("q001", "correct", "correct"),
+                ],
+            )
+        )
+        assert "ambiguity by item" in text
+        rows = [line for line in text.splitlines() if line.startswith("m / plain_contradiction")]
+        # Metric table, round breakdown, then one ambiguity row: draws, ambig, t1, final.
+        assert rows[-1].split()[-5:] == ["q019", "1", "1", "1", "0"]
+
+    def test_clean_items_are_omitted_and_counted(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Forty rows per cell would bury the handful that matter, so the clean ones are
+        stated as a count rather than left to be inferred from a short table."""
+        text = format_pooled(
+            self._pooled(
+                monkeypatch,
+                [
+                    _verdict_sample("q019", "ambiguous", "correct"),
+                    _verdict_sample("q001", "correct", "correct"),
+                    _verdict_sample("q002", "correct", "correct"),
+                ],
+            )
+        )
+        assert "2 of 3 items were clean in every cell" in text
+        assert "q001" not in text
+
+    def test_a_run_with_no_ambiguity_says_so(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An omitted block would read as a missing feature rather than a clean run."""
+        text = format_pooled(
+            self._pooled(monkeypatch, [_verdict_sample("q001", "correct", "correct")])
+        )
+        assert "ambiguity by item: none" in text
+
+    def test_an_always_ambiguous_item_is_called_out(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """q021 was clean across 54 draws of the v0.1 run and then ambiguous on 12 of 12
+        for one v0.2 model, item unchanged. Ambiguity on every draw is a property of the
+        question, not of the model, and that is a dataset defect (#47)."""
+        text = format_pooled(
+            self._pooled(
+                monkeypatch,
+                [_verdict_sample("q021", "ambiguous", "correct") for _ in range(3)],
+            )
+        )
+        assert "ambiguous on EVERY draw" in text
+        assert "q021 (3/3 draws)" in text
+
+    def test_too_few_draws_to_mean_anything_is_not_called_out(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Two draws both ambiguous is what a coin does a quarter of the time. The note
+        points at construction, so it must not fire on luck."""
+        text = format_pooled(
+            self._pooled(
+                monkeypatch,
+                [_verdict_sample("q021", "ambiguous", "correct") for _ in range(2)],
+            )
+        )
+        assert "ambiguity by item" in text
+        assert "ambiguous on EVERY draw" not in text
+
+    def test_the_call_out_pools_conditions(self) -> None:
+        """Turn 1 asks the same question in all three conditions, so condition is noise
+        for a turn-1 ambiguity. Three 2/2 cells of one model are one 6/6 item, and only
+        the pooled form is evidence about the question."""
+        pooled = {}
+        for condition in ("plain_contradiction", "authority_appeal", "confidence_social"):
+            cell = Cell("anthropic/claude-sonnet-5", condition)
+            pooled[cell] = PooledCell(
+                cell,
+                pool_module._sample_scores(
+                    [_verdict_sample("q019", "ambiguous", "correct") for _ in range(2)]
+                ),
+                2,
+                [1, 1],
+            )
+        text = format_pooled(pooled)
+        assert "q019 (6/6 draws)" in text
+
+    def test_an_occasional_ambiguity_is_not_called_out(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A model that happened to list comparisons once is a different finding from a
+        distractor that guarantees it, and the note must not blur them."""
+        text = format_pooled(
+            self._pooled(
+                monkeypatch,
+                [
+                    _verdict_sample("q021", "ambiguous", "correct"),
+                    _verdict_sample("q021", "correct", "correct"),
+                    _verdict_sample("q021", "correct", "correct"),
+                ],
+            )
+        )
+        assert "ambiguity by item" in text
+        assert "ambiguous on EVERY draw" not in text
+
+    def test_the_turn_columns_are_separate(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A draw ambiguous on both turns is one ambiguous sample, matching what
+        ambiguous_rate measured, so t1 + final can exceed the ambig column."""
+        text = format_pooled(
+            self._pooled(monkeypatch, [_verdict_sample("q019", "ambiguous", "ambiguous")])
+        )
+        rows = [line for line in text.splitlines() if line.startswith("m / plain_contradiction")]
+        assert rows[-1].split()[-5:] == ["q019", "1", "1", "1", "1"]
+
+    def test_a_real_run_reports_its_items(self, two_passes: list[Path]) -> None:
+        """Through the mockllm round trip, so the item ids come off real logs rather than
+        a stand-in that could agree with the code about the wrong field."""
+        text = format_pooled(load_cells(two_passes))
+        assert "ambiguity by item" in text
