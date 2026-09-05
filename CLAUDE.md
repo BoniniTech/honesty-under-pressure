@@ -46,6 +46,9 @@ honesty-under-pressure/
   pyproject.toml       # uv-managed; pinned deps
   .github/workflows/
     ci.yml             # lint + tests on every PR; no secrets, no provider calls
+  docs/
+    running.md         # operator guide: setup, caps, pooling, reproduction commands
+    transcripts.md     # both capitulation transcripts in full; README abridges one
   data/
     questions.jsonl
     README.md          # what the loader enforces vs. what a reader has to catch
@@ -91,14 +94,14 @@ Two surfaces carry a run's numbers: `runs/summaries/<run>.md`, the record of one
 3. **Show current numbers first.** The pooled table MUST be what `python -m hup.pool` prints now, never one promoted from an earlier addendum — the addendum in `full-2026-08-19.md` predates a re-score and still reads 0.9958 on a cell that is now 1.0000.
 4. **Per-item table before the per-cell table.** A cell rate reads as a uniform tendency, and six flips from two of forty questions is not one.
 5. **Legend every column abbreviation, one line each, on every table.** `ci_lo`, `elig` and `exc_wrong` are not self-describing.
-6. **Cite every quoted transcript** — `.eval` path, sample id, epoch. As text, not a link: the logs are gitignored, so a link is dead for exactly the reader the citation is for.
+6. **Cite every quoted transcript** — `.eval` path, sample id, epoch. As text, not a link: the logs are gitignored, so a link is dead for exactly the reader the citation is for. A transcript that leaves the README for `docs/transcripts.md` carries its own caveats with it: the `q038` retirement notice sits beside that transcript on both surfaces, because a reader landing on the standalone page would otherwise read a withdrawn item's flip as deference.
 
 Summaries carry two more, because the README publishes one set of numbers and is rewritten per run while a summary accumulates:
 
 7. **Move superseded tables into a collapsible `## History`,** marked as superseded there. Never delete one; never edit one in place.
 8. **Keep corrections verbatim, in writing order, indexed above the fold.** The original order keeps every "above" inside a correction resolving. A correction folded into the text it corrects is indistinguishable from never having been wrong.
 
-The README carries a **Latest run** link near the top, pointing at the newest summary that carries *results* — `runs/summaries/full-2026-08-19.md`, not whichever `runs/summaries/<run>.md` was written most recently. Summaries recording an incident, a probe or a slate decision are not results and do not move the pointer; `model-alias-drift`, `retry-hang` and `verdict-instability` are all newer than the current target and none of them should own that link. Update it in the same PR that adds a results summary — a stale pointer sends a reader to superseded numbers sitting under a heading that calls them current, and a mis-aimed one sends them somewhere with no numbers at all.
+The README references **exactly one** run summary: the **Latest run** link near the top, pointing at the newest summary that carries *results* — `runs/summaries/full-2026-09-05.md`, not whichever `runs/summaries/<run>.md` was written most recently. Summaries recording an incident, a probe or a slate decision are not results and do not move the pointer; `model-alias-drift`, `retry-hang` and `verdict-instability` are all newer than the current target and none of them should own that link. Update it in the same PR that adds a results summary — a stale pointer sends a reader to superseded numbers sitting under a heading that calls them current, and a mis-aimed one sends them somewhere with no numbers at all. **Carry no synopsis of any earlier run.** A superseded run's table, pass count, model slate or config belongs in its own summary, which is never deleted; repeating it in the README gives a reader two sets of numbers and no reason to prefer one. A previous run cited as *evidence for a methodological claim* is not a synopsis and stays — the test is whether removing it would leave a claim unsupported. Example commands in the README and `docs/running.md` glob the current run's directory, not an older one.
 
 Applies from here on, starting with the next full run. Do not retrofit existing summaries — the order they were written in is part of what they record.
 
