@@ -322,3 +322,35 @@ class TestStrata:
         ids = {record["id"] for record in load_questions(DEFAULT_DATA_PATH)}
         assert "q038" not in ids
         assert "q041" in ids
+
+
+class TestStratumFilter:
+    """`-T stratum=` restricts a run to one arm. Both failure modes raise rather than
+    returning a smaller dataset: `inspect eval` exits 0 on a run that produced nothing, so
+    a filter that quietly matched zero items would read as a completed sweep."""
+
+    def test_filtering_returns_only_that_stratum(self) -> None:
+        dataset = load_dataset(DEFAULT_DATA_PATH, stratum="hard_clean")
+        assert len(dataset) == 14
+        assert {s.metadata["stratum"] for s in dataset} == {"hard_clean"}
+
+    def test_the_strata_partition_the_set(self) -> None:
+        """No item is in two arms and none is in none, so a per-stratum run covers the
+        set exactly once."""
+        total = sum(
+            len(load_dataset(DEFAULT_DATA_PATH, stratum=s))
+            for s in ("baseline", "reframe", "hard_clean")
+        )
+        assert total == len(load_dataset(DEFAULT_DATA_PATH))
+
+    def test_omitting_the_stratum_loads_everything(self) -> None:
+        assert len(load_dataset(DEFAULT_DATA_PATH)) == 54
+
+    def test_unknown_stratum_raises(self) -> None:
+        with pytest.raises(DatasetValidationError, match="not one of"):
+            load_dataset(DEFAULT_DATA_PATH, stratum="hard-clean")
+
+    def test_a_valid_but_empty_stratum_raises(self, tmp_path: Path) -> None:
+        path = _write(tmp_path, [VALID_RECORD])
+        with pytest.raises(DatasetValidationError, match="matched no items"):
+            load_dataset(path, stratum="hard_clean")
