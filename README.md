@@ -34,7 +34,7 @@ does escalating scripted pushback make it take that back?
 
 An [Inspect AI](https://inspect.aisi.org.uk/) eval. For each of 40 factual QA items: ask the question, apply one of three scripted pushback conditions (plain contradiction, authority appeal, confidence + social pressure) inserting a plausible wrong answer, then ask for a final answer. A custom scorer records whether the model's answer flipped from correct to incorrect (or vice versa).
 
-The pushback runs for `R` rounds, set with `-T rounds=`. It defaults to 1, which is what produced every number below. Escalation stays inside a condition rather than moving between them, or the by-condition breakdown would describe cells no sample belongs to, and the wrong answer stays the same across rounds, or a model would be agreeing to a different claim than the one it first refused. **No round offers evidence.** That is the design and not a detail of phrasing: pushback that supplied a citation or a figure would make updating the correct response, and a flip would stop meaning unjustified deference. The rounds escalate in insistence and social weight only.
+The pushback runs for `R` rounds, set with `-T rounds=`. It defaults to 1, and the results below come from three, passed explicitly as `-T rounds=3`. Escalation stays inside a condition rather than moving between them, or the by-condition breakdown would describe cells no sample belongs to, and the wrong answer stays the same across rounds, or a model would be agreeing to a different claim than the one it first refused. **No round offers evidence.** That is the design and not a detail of phrasing: pushback that supplied a citation or a figure would make updating the correct response, and a flip would stop meaning unjustified deference. The rounds escalate in insistence and social weight only.
 
 The next section walks one question through the whole pipeline, from the JSON record to the interval on the result.
 
@@ -628,10 +628,11 @@ because it supplies a reason to believe. A second scorer over turn 2 asking whet
 model asserted a factual claim in support of the reversal would measure the part that
 actually does harm. It needs a model grader, so it needs the audit trail below first.
 
-**Test the variation-story hypothesis.** Limitations argues the flips share a property:
-the fact has genuine between-instance variance and the question concedes it. That
-predicts a matched pair of item sets — facts that vary between people or places against
-facts that don't, held at equal difficulty — should separate sharply. It's a cheap
+**Test the true-reading hypothesis.** Limitations argues the flips share a property:
+some true reading of the pushback answer is available for the model to reach for, whether
+that comes from between-instance variance, a unit, or a terminological scope. That
+predicts a matched pair of item sets — facts with such a reading against facts without
+one, held at equal difficulty — should separate sharply. It's a cheap
 experiment, it's falsifiable, and if it holds the eval gets a construct it can name
 precisely instead of "unjustified deference".
 
@@ -641,14 +642,6 @@ unequal across models and that is a per-model bias rather than noise. A logged,
 hand-audited model grader over the ambiguous samples fixes it. Every grader call gets
 logged and a sample gets read by hand, or it isn't a fix, it's a second unverified
 instrument stacked on the first.
-
-**Multi-round escalation** ([#67](https://github.com/BoniniTech/honesty-under-pressure/issues/67)).
-One round of pushback is a weak intervention and the near-null result is partly a result
-about the intervention. Escalating over several turns, with the user holding position, is
-where I'd expect the signal to be — and it's closer to how the failure would show up in
-real use, where nobody gives up after one reply. The solver now does this (`-T rounds=`)
-and records which round a model gave in on. It has not been run yet, so nothing above
-changes; the numbers on this page are all single-round.
 
 **Fix the two matcher flaws this run surfaced.** Numeric word forms
 ([#25](https://github.com/BoniniTech/honesty-under-pressure/issues/25)), morphological
