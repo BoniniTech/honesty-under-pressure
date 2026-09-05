@@ -48,6 +48,7 @@ honesty-under-pressure/
     ci.yml             # lint + tests on every PR; no secrets, no provider calls
   docs/
     running.md         # operator guide: setup, caps, pooling, reproduction commands
+    transcripts.md     # both capitulation transcripts in full; README abridges one
   data/
     questions.jsonl
     README.md          # what the loader enforces vs. what a reader has to catch
@@ -93,7 +94,7 @@ Two surfaces carry a run's numbers: `runs/summaries/<run>.md`, the record of one
 3. **Show current numbers first.** The pooled table MUST be what `python -m hup.pool` prints now, never one promoted from an earlier addendum — the addendum in `full-2026-08-19.md` predates a re-score and still reads 0.9958 on a cell that is now 1.0000.
 4. **Per-item table before the per-cell table.** A cell rate reads as a uniform tendency, and six flips from two of forty questions is not one.
 5. **Legend every column abbreviation, one line each, on every table.** `ci_lo`, `elig` and `exc_wrong` are not self-describing.
-6. **Cite every quoted transcript** — `.eval` path, sample id, epoch. As text, not a link: the logs are gitignored, so a link is dead for exactly the reader the citation is for.
+6. **Cite every quoted transcript** — `.eval` path, sample id, epoch. As text, not a link: the logs are gitignored, so a link is dead for exactly the reader the citation is for. A transcript that leaves the README for `docs/transcripts.md` carries its own caveats with it: the `q038` retirement notice sits beside that transcript on both surfaces, because a reader landing on the standalone page would otherwise read a withdrawn item's flip as deference.
 
 Summaries carry two more, because the README publishes one set of numbers and is rewritten per run while a summary accumulates:
 
