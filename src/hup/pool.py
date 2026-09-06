@@ -382,6 +382,16 @@ class Arm:
     def __str__(self) -> str:
         return f"{self.stratum} (registered)" if self.registered_only else self.stratum
 
+    @property
+    def labelled(self) -> bool:
+        """False for the catch-all arm holding samples that carry no stratum at all.
+
+        A property rather than a check on the label's shape: `_UNLABELLED` is a display
+        string, and a consumer keying off its parentheses would silently start including
+        it the day the wording changed.
+        """
+        return self.stratum != _UNLABELLED
+
 
 # Sample metadata written by a run whose dataset had no strata. Kept as its own arm
 # rather than dropped, so a pool mixing pre- and post-schema logs shows the mixture in

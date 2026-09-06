@@ -23,7 +23,9 @@ from hup.chart import (
     _model_label,
     _num,
     _short_condition,
+    arm_results,
     axis_max_for,
+    by_stratum_figure,
     cell_results,
     flip_rate_figure,
     flipping_cell,
@@ -315,3 +317,113 @@ class TestAxisMax:
     def test_an_explicit_axis_still_wins(self) -> None:
         wide = CellResult(Cell("m/x", "c"), 240, 60, 0.25, 0.18, 0.32, False)
         assert "0.50" in flip_rate_figure([wide], axis_max=0.5)
+
+
+def _stratum_score(
+    item: str, stratum: str, *, registered: bool = False, flipped: bool = False
+) -> SampleScore:
+    """A scored sample carrying its item's design labels in sample metadata.
+
+    The labels live there rather than in score metadata because they describe the
+    question, not the answer, which is why no re-score can backfill them.
+    """
+    score = _score("correct", "wrong" if flipped else "correct", item)
+    return SampleScore(
+        score=score.score,
+        sample_id=score.sample_id,
+        sample_metadata={"stratum": stratum, "registered": registered},
+    )
+
+
+def _two_arm_run() -> dict[Cell, PooledCell]:
+    """31 baseline questions and 20 reframe, 12 of the reframe pre-registered."""
+    scores = [_stratum_score(f"q{i:03d}", "baseline") for i in range(31)]
+    scores += [_stratum_score(f"r{i:03d}", "reframe", registered=i >= 8) for i in range(20)]
+    scores += [_stratum_score("r002", "reframe", flipped=True)]
+    scores += [_stratum_score("r009", "reframe", registered=True, flipped=True)]
+    return _cell("openai/x", "plain_contradiction", scores)
+
+
+class TestArmResults:
+    def test_unlabelled_logs_yield_no_arms(self) -> None:
+        """Every sample in the 2026-09-05 published run predates the stratum schema."""
+        assert arm_results(_cell("anthropic/x", "authority_appeal", _full_run_shaped())) == []
+
+    def test_the_registered_subset_is_its_own_arm(self) -> None:
+        arms = {str(result.arm): result for result in arm_results(_two_arm_run())}
+        assert set(arms) == {"baseline", "reframe", "reframe (registered)"}
+        assert arms["baseline"].items == 31
+        assert arms["reframe"].items == 20
+        assert arms["reframe (registered)"].items == 12
+
+    def test_a_zero_flip_arm_reports_its_zero_event_bound(self) -> None:
+        """31 questions rule out a rate above 0.1122 and nothing tighter. A bound of
+        zero would claim the arm was measured not to flip."""
+        baseline = next(r for r in arm_results(_two_arm_run()) if str(r.arm) == "baseline")
+        assert baseline.flips == 0
+        assert baseline.zero_event
+        assert baseline.lower == 0.0
+        assert round(baseline.upper, 4) == 0.1122
+
+
+class TestByStratumFigure:
+    def test_it_is_well_formed_svg(self) -> None:
+        svg = by_stratum_figure(arm_results(_two_arm_run()))
+        assert ElementTree.fromstring(svg).tag.endswith("svg")
+
+    def test_every_row_carries_its_question_count(self) -> None:
+        """The bootstrap resamples questions, so k and not the draw count sets the
+        interval width. A reader comparing two arms is comparing two item counts."""
+        svg = by_stratum_figure(arm_results(_two_arm_run()))
+        for expected in ("k=31", "k=20", "k=12"):
+            assert expected in svg, expected
+
+    def test_the_footer_is_derived_rather_than_hardcoded(self) -> None:
+        """A footer stating one run's numbers is wrong the next time the figure is
+        regenerated, in a file whose whole point is being diffable."""
+        svg = by_stratum_figure(arm_results(_two_arm_run()))
+        assert "does not separate them" in svg
+        assert "0.1122" not in svg.split("k is the question count")[0].split("</text>")[-1]
+
+    def test_it_refuses_to_draw_nothing(self) -> None:
+        """An empty figure under a caption saying it compares the arms is worse than
+        no figure at all."""
+        with pytest.raises(ValueError, match="no arm carries a stratum label"):
+            by_stratum_figure([])
+
+
+class TestByStratumInMain:
+    def test_it_writes_the_third_figure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("hup.chart.load_cells", lambda _paths: _two_arm_run())
+        assert main([str(tmp_path / "fake.eval"), "--output-dir", str(tmp_path / "out")]) == 0
+        written = (tmp_path / "out" / "by-stratum.svg").read_text(encoding="utf-8")
+        assert ElementTree.fromstring(written).tag.endswith("svg")
+
+    def test_a_run_without_strata_skips_it_and_says_so(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """A pool of pre-schema logs is not a failure, and the two figures above it
+        still render. Silence would read as a figure that was written."""
+        pooled = _cell("anthropic/x", "authority_appeal", _full_run_shaped())
+        monkeypatch.setattr("hup.chart.load_cells", lambda _paths: pooled)
+        assert main([str(tmp_path / "fake.eval"), "--output-dir", str(tmp_path / "out")]) == 0
+        assert "skipped by-stratum.svg" in capsys.readouterr().out
+        assert not (tmp_path / "out" / "by-stratum.svg").exists()
+
+    def test_a_single_arm_run_skips_it(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """`-T stratum=reframe` restricts a run to one arm, which is legitimate and has
+        no comparison to draw."""
+        # One flip, because `flipping_cell` raises on an all-zero run before the
+        # by-stratum step is reached. That crash is real and tracked separately; it is
+        # not what this test is about.
+        scores = [_stratum_score(f"r{i:03d}", "reframe") for i in range(9)]
+        scores += [_stratum_score("r003", "reframe", flipped=True)]
+        monkeypatch.setattr(
+            "hup.chart.load_cells", lambda _paths: _cell("openai/x", "plain_contradiction", scores)
+        )
+        assert main([str(tmp_path / "fake.eval"), "--output-dir", str(tmp_path / "out")]) == 0
+        assert "1 labelled arm(s)" in capsys.readouterr().out

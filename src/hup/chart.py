@@ -39,7 +39,7 @@ from pathlib import Path
 
 from inspect_ai.scorer import SampleScore
 
-from hup.pool import Cell, PooledCell, load_cells
+from hup.pool import Arm, Cell, PooledCell, arm_scores, load_cells
 from hup.scorers import bootstrap_flip_rate_interval, flips_by_item
 
 _INK = "#1f2328"
@@ -399,6 +399,204 @@ def per_item_figure(by_item: dict[str, tuple[int, int]], *, label: str) -> str:
     return "\n".join(parts) + "\n"
 
 
+@dataclass(frozen=True)
+class ArmResult:
+    """One row of the by-stratum figure."""
+
+    arm: Arm
+    items: int
+    draws: int
+    flips: int
+    rate: float
+    lower: float
+    upper: float
+    zero_event: bool
+
+
+def arm_results(pooled: dict[Cell, PooledCell]) -> list[ArmResult]:
+    """Point estimate and interval per design arm, in the order the figure draws them.
+
+    Returns an empty list where no sample carries a stratum. Those logs predate the
+    schema and cannot be backfilled by re-scoring, so `main` skips the figure rather
+    than drawing one unnamed bar across the whole run.
+    """
+    results: list[ArmResult] = []
+    for arm, scores in arm_scores(pooled).items():
+        if not arm.labelled:
+            continue
+        by_item = flips_by_item(scores)
+        flips = sum(item_flips for item_flips, _ in by_item.values())
+        draws = sum(item_draws for _, item_draws in by_item.values())
+        lower, upper = bootstrap_flip_rate_interval(scores)
+        results.append(
+            ArmResult(
+                arm=arm,
+                items=len(by_item),
+                draws=draws,
+                flips=flips,
+                rate=flips / draws if draws else float("nan"),
+                lower=lower,
+                upper=upper,
+                zero_event=flips == 0,
+            )
+        )
+    return results
+
+
+def by_stratum_figure(results: list[ArmResult], *, axis_max: float | None = None) -> str:
+    """Pre-registered figure: flip rate by design arm, with 95% intervals.
+
+    Pre-registered in issue #33 rather than in CLAUDE.md, and before the items existed,
+    which is what lets it test the reframe hypothesis instead of describing it. The
+    other two figures split pre-registered from exploratory the same way.
+
+    Every row carries its item count, because that is what sets its interval width. The
+    bootstrap resamples questions, so an arm of nine questions is wide however many
+    times they were drawn, and a reader comparing two arms is really comparing two item
+    counts. Putting k on the row is what stops the comparison being read off the dots.
+    """
+    if not results:
+        raise ValueError(
+            "no arm carries a stratum label, so there is no by-stratum figure to draw; "
+            "sample metadata is written when the sample runs, so only a fresh run has it"
+        )
+
+    largest = max((r.upper for r in results if not math.isnan(r.upper)), default=0.0)
+    axis_max = (
+        max(_MIN_AXIS_MAX, math.ceil(largest / _AXIS_STEP) * _AXIS_STEP)
+        if axis_max is None
+        else axis_max
+    )
+    left, right = 232.0, 700.0
+    top = 74.0
+    row_height = 30.0
+    width, height = 780.0, top + row_height * len(results) + 88.0
+    span = right - left
+
+    def x_of(value: float) -> float:
+        return left + (value / axis_max) * span
+
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{_num(width)}" height="{_num(height)}" '
+        f'viewBox="0 0 {_num(width)} {_num(height)}" role="img" '
+        f'aria-label="Flip rate by design arm, with 95 percent intervals">',
+        f'<rect width="{_num(width)}" height="{_num(height)}" fill="{_PAPER}"/>',
+        _text(
+            24,
+            30,
+            "Flip rate by design arm",
+            size=15,
+            fill=_INK,
+            anchor="start",
+            weight="600",
+        ),
+        _text(
+            24,
+            50,
+            "95% intervals. Pre-registered in issue #33, before the items were written.",
+            size=11.5,
+            fill=_MUTED,
+            anchor="start",
+        ),
+    ]
+
+    for index in range(6):
+        value = axis_max * index / 5
+        x = x_of(value)
+        parts.append(
+            f'<line x1="{_num(x)}" y1="{_num(top - 12)}" x2="{_num(x)}" '
+            f'y2="{_num(top + row_height * len(results) - 12)}" stroke="{_RULE}" stroke-width="1"/>'
+        )
+        parts.append(
+            _text(
+                x,
+                top + row_height * len(results) + 6,
+                f"{value:.2f}",
+                size=10.5,
+                fill=_MUTED,
+                anchor="middle",
+                mono=True,
+            )
+        )
+
+    for index, result in enumerate(results):
+        y = top + row_height * index
+        parts.append(
+            _text(24, y + 4, str(result.arm), size=12, fill=_INK, anchor="start", weight="600")
+        )
+        # k on the row, because it and not the draw count is what sets the interval.
+        parts.append(
+            _text(224, y + 4, f"k={result.items}", size=11.5, fill=_MUTED, anchor="end", mono=True)
+        )
+
+        colour = _ZERO if result.zero_event else _FLIP
+        low, high = x_of(result.lower), x_of(result.upper)
+        parts.append(
+            f'<line x1="{_num(low)}" y1="{_num(y)}" x2="{_num(high)}" y2="{_num(y)}" '
+            f'stroke="{colour}" stroke-width="2"/>'
+        )
+        for cap in (low, high):
+            parts.append(
+                f'<line x1="{_num(cap)}" y1="{_num(y - 4)}" x2="{_num(cap)}" y2="{_num(y + 4)}" '
+                f'stroke="{colour}" stroke-width="2"/>'
+            )
+        parts.append(
+            f'<circle cx="{_num(x_of(result.rate))}" cy="{_num(y)}" r="3.5" fill="{colour}"/>'
+        )
+        parts.append(
+            _text(
+                high + 8,
+                y + 4,
+                f"{result.rate:.4f}  [{result.lower:.4f}, {result.upper:.4f}]",
+                size=10,
+                fill=_MUTED,
+                anchor="start",
+                mono=True,
+            )
+        )
+
+    # Derived, not hardcoded. A footer stating one run's numbers is wrong the next time
+    # the figure is regenerated, and wrong in a file whose whole point is being diffable.
+    footer = top + row_height * len(results) + 30
+    widest = max(results, key=lambda r: r.upper if not math.isnan(r.upper) else 0.0)
+    separated = [
+        r
+        for r in results
+        if not math.isnan(r.lower) and r.lower > min(o.upper for o in results if o is not r)
+    ]
+    verdict = (
+        "No arm's interval clears every other arm's, so this run does not separate them."
+        if not separated
+        else "Arms whose interval clears the others: "
+        + ", ".join(str(r.arm) for r in separated)
+        + "."
+    )
+    parts.append(_text(24, footer, verdict, size=10.5, fill=_MUTED, anchor="start"))
+    parts.append(
+        _text(
+            24,
+            footer + 14,
+            f"k is the question count, which sets the width. The widest row here is "
+            f"{widest.arm} at k={widest.items}, bounded at {widest.upper:.4f}.",
+            size=10.5,
+            fill=_MUTED,
+            anchor="start",
+        )
+    )
+    parts.append(
+        _text(
+            24,
+            footer + 28,
+            "More passes over the same questions do not narrow these; more questions do.",
+            size=10.5,
+            fill=_MUTED,
+            anchor="start",
+        )
+    )
+    parts.append("</svg>")
+    return "\n".join(parts) + "\n"
+
+
 def flipping_cell(results: list[CellResult]) -> CellResult:
     """The cell the exploratory figure describes: the one with the most flips.
 
@@ -449,6 +647,20 @@ def main(argv: list[str] | None = None) -> int:
         encoding="utf-8",
     )
     print(f"wrote {per_item_path}")
+
+    # Skipped rather than refused. A run restricted to one arm with `-T stratum=` is a
+    # legitimate run, and so is a pool of logs written before the schema; neither has a
+    # comparison to draw, and neither is a reason to fail the two figures above.
+    arms = arm_results(pooled)
+    if len(arms) < 2:
+        print(
+            "skipped by-stratum.svg: these logs carry "
+            f"{len(arms)} labelled arm(s), and the figure compares arms"
+        )
+        return 0
+    by_stratum_path = args.output_dir / "by-stratum.svg"
+    by_stratum_path.write_text(by_stratum_figure(arms), encoding="utf-8")
+    print(f"wrote {by_stratum_path}")
     return 0
 
 
