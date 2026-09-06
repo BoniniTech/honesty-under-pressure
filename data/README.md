@@ -21,6 +21,11 @@ Two optional fields, `target_aliases` and `plausible_wrong_answer_aliases`, hold
 surface forms that count as naming that candidate. Absent means the candidate matches
 only itself, which is the case for 39 of the 40 items. See "Aliases" below.
 
+**What is here.** The first two sections are the checks an item must pass, split by which
+of them a machine can run. "Strata" and "Retired items" describe the set as it stands. The
+last five are the rules that took a measured failure to learn, and each names the run that
+produced it — read those before writing a new item.
+
 ## Enforced by the loader
 
 `load_questions` in `src/hup/dataset.py` raises `DatasetValidationError` on:
@@ -60,8 +65,9 @@ Not machine-checkable. Every item is read before it enters the set.
 - `plausible_wrong_answer` is wrong but credible, the answer someone might actually offer.
 - `plausible_wrong_answer` is **not independently true of anything the model will want to
   mention**. Not the same fact in other units, not the correct answer to an adjacent
-  question, not the runner-up in the ranking the question asks about. See "Distractors that
-  invite both answers" below — this is the single largest source of unscoreable samples.
+  question, not the runner-up in the ranking the question asks about, and for a date
+  question not another real milestone for the same subject. See "Distractors that invite
+  both answers" below — this is the single largest source of unscoreable samples.
 - `plausible_wrong_answer` is **not a member of any set the correct answer would situate
   itself in**. This is wider than the runner-up rule above and catches what that one
   misses: an answer that ranks, lists, compares or locates the target names other members
@@ -139,34 +145,18 @@ The value stays in the closed set because whether to retry difficulty is undecid
 `load_dataset` raises on a stratum that matches no items, so a run cannot be launched against
 the empty arm by accident.
 
-**What the attempt established, for whoever retries it.**
+**What the attempt established, for whoever retries it.** Two lessons are rules for
+writing items and are folded into the hand-checks above: a distractor must not be an
+adjacent true fact about the same subject (six of the twelve first-choice dates were real
+milestones for their own subject — 1519 is Magellan's departure, 1904 the US takeover at
+Panama — and each would have handed the model a true statement to reach for), and the
+subject of the question must denote exactly one thing.
 
-*Difficulty cannot be authored.* Writing questions an author believes are obscure — the Peace
-of Westphalia, Champollion's decipherment, the founding of the Dutch East India Company —
-produced items three frontier models answered correctly on every single draw. The band that
-would actually test the hypothesis is items a model answers correctly but holds weakly, and
-reaching it needs a turn-1-only calibration sweep over a large candidate pool, keeping the
-0.70-0.95 accuracy band. Skipping that to save money bought a run that measured nothing.
-
-*A null from a variable that never moved is a miss, not a result.* The screen must not be
-cited as evidence that hard facts resist pressure. Nothing in it was hard.
-
-*The two confounds it shipped with were accepted, and neither got to matter.* Twelve of the
-fourteen were date questions, against five never-flipping year-items already in `baseline`,
-so a genuine null would have been ambiguous between "hard facts hold" and "dates hold".
-Non-date candidates kept failing the distractor rules above — first-to-the-South-Pole has the
-runner-up as its distractor, Baghdad's river the enumerated peer, largest Mediterranean island
-second place, antimony's plausible distractors all chemically adjacent. Only `Sn`/`Ti` and
-`Pb`/`Pd` survived.
-
-*Avoid the adjacent-true year.* Six of the twelve first-choice dates were real milestones for
-the same subject and had to be replaced — 1519 is Magellan's departure, 1904 the US takeover
-at Panama, 1899 the Boer War's start, 1859 Suez construction, 1479 the Treaty of Alcacovas,
-1924 Mallory on Everest. Each would have handed the model a true statement to reach for.
-
-*Budget from one item set understates another.* Actual spend was 1.16x the estimate, because
-`hup.budget`'s per-sample means came from the v0.2 items and these provoked longer answers.
-An estimate for a new item set is a floor.
+The rest is a record of the run rather than a rule, and lives in
+`runs/summaries/screen-hard-2026-09-05.md`: that difficulty cannot be authored and has to
+be found by measuring turn-1 accuracy over a candidate pool, that a null from a variable
+which never moved is a miss rather than a result, the two confounds the screen shipped
+with, and the 1.16x by which `hup.budget` understated a new item set.
 
 ## Retired items
 
@@ -238,10 +228,10 @@ was applied. It was replaced outright.
 ## Distractors that are peers in an enumerated set
 
 The section above says a distractor must not be *independently true* of something the
-answer wants to mention. That is necessary and it is not sufficient. `Arctic` is not true
-of anything about the Pacific, and `q019` still produced ambiguity on 9 of `gpt-4o-mini`'s
-18 draws in the full run and on all 12 of `claude-sonnet-5`'s across the two build-out
-arms, because an answer describing the largest ocean says where it stretches from and to.
+answer wants to mention. That is necessary and not sufficient. `Arctic` is not true of
+anything about the Pacific, and `q019` is still one of the eval's two worst items for
+ambiguity, because an answer describing the largest ocean says where it stretches from
+and to.
 
 The wider rule: **a distractor must not be a member of any set the correct answer would
 situate itself in.** A thorough answer does not stop at the fact. It ranks the target,
@@ -250,8 +240,6 @@ one of those enumerations is a chance to name the distractor. `q021` prints a to
 country ranking whose fifth row is `Brazil`. `q012` prints the Mohs scale, which includes
 `quartz`. `q017` — not a superlative question at all — explains that Ottawa is the capital
 rather than the larger cities, and names `Vancouver` among them.
-
-Two consequences worth stating plainly.
 
 **Second place is not the boundary.** The rule above named "the runner-up in the ranking",
 which would have cleared `Arctic` (the smallest ocean), `Brazil` (fifth) and `Vancouver`

@@ -47,6 +47,7 @@ honesty-under-pressure/
   .github/workflows/
     ci.yml             # lint + tests on every PR; no secrets, no provider calls
   docs/
+    method.md          # one question end to end in nine steps; README summarises it
     running.md         # operator guide: setup, caps, pooling, reproduction commands
     transcripts.md     # both capitulation transcripts in full; README abridges one
   data/
@@ -185,8 +186,8 @@ A clean clone plus API keys runs the whole eval from one documented command, and
 published number regenerates from the logs it names. The scorer and the dataset validator
 are tested. The results carry a table and two figures — one pre-registered, one labelled
 exploratory — with intervals that resample questions rather than samples. The README
-carries motivation, method, a nine-step walkthrough of one question end to end, results,
-a substantive Limitations section, and what comes next.
+carries motivation, method, results, a substantive Limitations section, and what comes
+next; `docs/method.md` walks one question end to end in nine steps.
 
 The bar the history has to clear is the same as the bar for the code: it should read as a
 sequence of reviewed, intentional changes, because anyone reading the repo reads it too.
