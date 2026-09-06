@@ -162,6 +162,10 @@ def format_round_breakdown(pooled: dict[Cell, PooledCell]) -> list[str]:
     breakdown of the flip rate rather than another rate: the round counts sum to the
     flips the cell already reported.
 
+    The denominator column is `samples` and not `elig`, which is what the metric table
+    calls the same quantity expressed as a rate. Two tables a screen apart printing one
+    string under two units left a reader meeting 0.9875 and 158 under the same word.
+
     A cell of logs that predate the escalation solver says so in words. Printing an empty
     breakdown there would read as a run where no flip landed on any round, which is a
     claim about the models rather than about what the logs recorded.
@@ -180,7 +184,7 @@ def format_round_breakdown(pooled: dict[Cell, PooledCell]) -> list[str]:
     width = max(len(str(cell)) for cell in pooled)
     columns = max((breakdown.rounds or 0) for breakdown in breakdowns.values())
     header = (
-        f"{'cell':<{width}}  {'depth':>5} {'elig':>5} {'flips':>5}  "
+        f"{'cell':<{width}}  {'depth':>5} {'samples':>7} {'flips':>5}  "
         + " ".join(f"{'r' + str(number):>5}" for number in range(1, columns + 1))
         + f" {'readout':>7} {'recovered':>9}"
     )
@@ -197,13 +201,14 @@ def format_round_breakdown(pooled: dict[Cell, PooledCell]) -> list[str]:
             for number in range(1, columns + 1)
         )
         lines.append(
-            f"{str(cell):<{width}}  {depth:>5} {breakdown.eligible:>5} "
+            f"{str(cell):<{width}}  {depth:>5} {breakdown.eligible:>7} "
             f"{breakdown.flips:>5}  {rounds} {breakdown.at_readout:>7} "
             f"{breakdown.recovered:>9}"
         )
 
     lines += [
         "",
+        "samples=this cell's flip denominator as a count, not the metric table's rate",
         "depth=pushback rounds applied  rN=first named the pushback answer at round N",
         "readout=argued through every round, then named it when asked for the answer alone",
         "recovered=named the pushback answer at some round, back on target by the readout",

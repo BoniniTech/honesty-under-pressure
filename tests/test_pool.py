@@ -406,6 +406,35 @@ class TestRoundBreakdownOutput:
         # readout then recovered: the flip is the readout's, and no round column claims it.
         assert rows[1].split()[-2:] == ["1", "0"]
 
+    def test_the_two_tables_share_no_column_name_but_cell(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A name printed by both tables has to mean the same thing in both.
+
+        The metric table reports `eligible_rate` as a proportion and the breakdown
+        reports the same quantity as a count of samples. Both were headed `elig`, a
+        screen apart, so a reader met 0.9875 and 158 under one word. `cell` is the only
+        name that legitimately appears twice, because it is the same label both times.
+        """
+        text = format_pooled(
+            self._pooled(
+                monkeypatch,
+                [_round_sample("t001", flipped=True, round_verdicts=["wrong"], flip_round=1)],
+            )
+        )
+        lines = text.splitlines()
+        breakdown_at = next(
+            index for index, line in enumerate(lines) if "where the flips happened" in line
+        )
+        metric_header = next(line for line in lines[:breakdown_at] if line.startswith("cell"))
+        breakdown_header = next(line for line in lines[breakdown_at:] if line.startswith("cell"))
+        shared = set(metric_header.split()) & set(breakdown_header.split())
+        assert shared == {"cell"}, (
+            f"the metric table and the round breakdown both print {sorted(shared)}. "
+            f"Every column but `cell` means something different in the two tables, so a "
+            f"shared name is two units under one word."
+        )
+
     def test_logs_without_round_data_say_so_rather_than_printing_zeros(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
