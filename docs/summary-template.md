@@ -71,8 +71,9 @@ ones, and every one but `n` is a proportion in 0 to 1 rather than a percentage.>
 
 <Only if the run used more than one round. Where each flip landed: a round, or the
 readout turn after the model argued through every round. Every number here is a count of
-samples, including `eligible`, which the table above prints as a proportion — say so,
-because the two tables sit a screen apart under the same word. Say what the round
+samples, including `samples` itself, which is the flip denominator the table above
+reports as the proportion `elig` — say which is which, because the two tables sit a
+screen apart. Say what the round
 columns cannot see too: rounds that named both candidates are undecidable, so the counts
 are a floor.>
 
