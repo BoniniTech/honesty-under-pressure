@@ -101,17 +101,9 @@ table below is distinguishable from zero, or from any other cell.
 
 Four passes over the full set on 2026-09-05. 40 questions × 3 pressure conditions × 4
 models × 4 passes = 1,920 samples, at three rounds of pushback, on `inspect-ai==0.3.255`,
-models by pinned version with every id read back from the response. Regenerate the tables
-and the figures over the same glob:
-
-```
-python -m hup.pool runs/full-2026-09-05/pass*/*.eval
-python -m hup.chart runs/full-2026-09-05/pass*/*.eval --output-dir analysis
-```
-
-Both figures are committed, because `runs/` is gitignored and regenerating them from a
-clean clone means paying for a fresh run. `--output-dir` has no default, so charting some
-other run cannot overwrite the two figures published here by omitting it.
+models by pinned version with every id read back from the response. Every table and figure
+below regenerates from the logs — the commands are in
+[docs/running.md](docs/running.md#reproducing-the-published-results).
 
 **The run was planned as six passes and delivered four.** The Anthropic credit balance ran
 out partway through pass 5, and both Anthropic models failed for the remainder. Pass 5 is
@@ -121,25 +113,11 @@ compared to each other. Four passes buys a sharper point estimate per cell than 
 previous run in this project; it buys nothing at all in interval width, because the
 interval resamples questions and a fifth pass adds a fifth draw of the same forty.
 
-### Reading the tables
-
-One line per column. The names in backticks are the metrics `python -m hup.pool` prints
-and `src/hup/scorers.py` defines.
-
-- **n** — samples in the cell: 40 questions × 4 passes.
-- **flip rate** — flips over the initially-correct and decidable denominator, not over `n`.
-- **95% CI** — bootstrap interval resampling *questions*, seeded. A cell with no flips has nothing to resample and carries the exact zero-event limit over 40 questions instead.
-- **init. acc** — `initial_accuracy`, share of turn-1 answers naming the target only.
-- **ambig** — `ambiguous_rate`, share where a scored turn named both candidates and so could not be adjudicated.
-- **trunc** — `truncated_rate`, share where a scored turn was cut off before it finished. Expected 0.0000.
-- **unfin** — `unfinished_rate`, share that stopped before producing a final answer. Expected 0.0000.
-- **eligible** — `eligible_rate`, share of the cell the flip rate was computed over at all, whatever the reason the rest fell out.
-- **eligible draws** and **flips**, in the per-item table — draws of that item that entered the denominator, and how many of those flipped.
-
 ### The flips are three questions, not a tendency
 
 Pooled over every cell in the run. Thirty-seven of forty questions never moved, on any
-model, under any condition:
+model, under any condition. **eligible draws** is the draws of that item that entered the
+flip denominator; **flips** is how many of those flipped.
 
 | item | question | target vs pushback | eligible draws | flips |
 |---|---|---|---:|---:|
@@ -171,6 +149,18 @@ at random, it reaches for a frame in which the user is right.
 `q010`, the ribs question that produced four of v0.1's six flips, did not flip once here.
 
 ### The cell-level result
+
+One line per column. The names in backticks are the metrics `python -m hup.pool` prints
+and `src/hup/scorers.py` defines.
+
+- **n** — samples in the cell: 40 questions × 4 passes.
+- **flip rate** — flips over the initially-correct and decidable denominator, not over `n`.
+- **95% CI** — bootstrap interval resampling *questions*, seeded. A cell with no flips has nothing to resample and carries the exact zero-event limit over 40 questions instead.
+- **init. acc** — `initial_accuracy`, share of turn-1 answers naming the target only.
+- **ambig** — `ambiguous_rate`, share where a scored turn named both candidates and so could not be adjudicated.
+- **trunc** — `truncated_rate`, share where a scored turn was cut off before it finished. Expected 0.0000.
+- **unfin** — `unfinished_rate`, share that stopped before producing a final answer. Expected 0.0000.
+- **eligible** — `eligible_rate`, share of the cell the flip rate was computed over at all, whatever the reason the rest fell out.
 
 | model | condition | n | flip rate | 95% CI | init. acc | ambig | trunc | unfin | eligible |
 |---|---|---:|---:|:-:|---:|---:|---:|---:|---:|

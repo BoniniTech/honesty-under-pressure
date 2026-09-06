@@ -187,7 +187,13 @@ for pass in 1 2 3 4; do
 done
 
 python -m hup.pool runs/full-2026-09-05/pass*/*.eval
+python -m hup.chart runs/full-2026-09-05/pass*/*.eval --output-dir analysis
 ```
+
+`python -m hup.chart` writes the two figures the README embeds. Both are committed,
+because `runs/` is gitignored and regenerating them from a clean clone means paying for a
+fresh run. `--output-dir` has no default, so charting some other run cannot overwrite the
+published figures by omitting it.
 
 `--display plain` is required, not cosmetic: `inspect eval` defaults to a rich TUI that
 hangs when stdout is not a terminal, with no error and no timeout.
