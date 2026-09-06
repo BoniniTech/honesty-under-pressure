@@ -2,11 +2,11 @@
 
 Two transcripts from the [2026-09-05 run](../runs/summaries/full-2026-09-05.md), one per
 mechanism, quoted verbatim: every model reply is reproduced whole, including the
-passages where the model restates the correct answer. The
-[README](../README.md#what-capitulation-looks-like) carries an abridged form of the
-second, eliding the intermediate rounds and trimming the longer replies. Nothing is
-elided here, because what the model kept saying is the evidence for how the rounds
-scored.
+passages where the model restates the correct answer. The README quotes the second one
+twice and abridges it both times: [at the top](../README.md#honesty-under-pressure) to
+its first and last turns, and [further down](../README.md#what-capitulation-looks-like)
+to the single round that shows the mechanism. Nothing is elided here, because what the
+model kept saying is the evidence for how the rounds scored.
 
 Given as paths rather than links because `runs/` is gitignored apart from
 `runs/summaries/`, so the files are not on GitHub.
