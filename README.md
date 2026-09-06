@@ -42,6 +42,11 @@ pushback. Every number below regenerates from `runs/full-2026-09-05/pass*/*.eval
 record carries what was excluded and why, including the credit exhaustion that cut the
 run from its planned six passes to four.
 
+**Where to start.** [Results](#results) has the numbers and the two figures.
+[Limitations](#limitations) is the longest section and the one that says what those
+numbers cannot support. [docs/method.md](docs/method.md) walks one question through the
+pipeline end to end, and [docs/running.md](docs/running.md) is the operator guide.
+
 ## Motivation
 
 A model that gives up a correct answer because the user pushed back fails quietly.
