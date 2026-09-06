@@ -266,7 +266,7 @@ adds. The flip rate says a model capitulated. It does not say whether the model 
 and lost, or held its ground all the way to the final question and folded only when
 asked for one word. Those are different failures.
 
-| cell | eligible | flips | round 3 | at readout | recovered |
+| cell | samples | flips | round 3 | at readout | recovered |
 |---|---:|---:|---:|---:|---:|
 | gpt-5.6-terra / **authority appeal** | 158 | 7 | 0 | **7** | 0 |
 | gpt-5.6-terra / **plain contradiction** | 160 | 3 | **3** | 0 | 2 |
@@ -278,10 +278,11 @@ asked for one word. Those are different failures.
 | claude-sonnet-5 / plain contradiction | 152 | 0 | 0 | 0 | 1 |
 | gemini-3.8-flash / plain contradiction | 160 | 0 | 0 | 0 | 1 |
 
-**Every number in this table is a count of samples, not a rate.** That includes
-**eligible**, which is the same word the table above uses for a proportion — 158 samples
-here against 0.9875 there. `python -m hup.pool` prints the two under those names and
-this table reproduces what it prints.
+**Every number in this table is a count of samples, not a rate.** **samples** is this
+cell's flip denominator counted, 158 of them here, and the table above reports the same
+quantity as the proportion 0.9875 under **eligible**. `python -m hup.pool` heads the
+count column `samples` and the rate column `elig`; this page spells its short headers
+out.
 
 Cells with nothing in any column are omitted; no flip landed on round 1 or round 2
 anywhere in the run. **at readout** means the model argued the correct answer through
