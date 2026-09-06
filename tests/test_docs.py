@@ -16,7 +16,7 @@ stay wrong.
 from __future__ import annotations
 
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -115,6 +115,59 @@ def test_eval_globs_are_scoped_to_pass_directories(doc: str, module: str, args: 
             f"Use runs/<run>/pass*/*.eval — the wider glob silently pools the runs kept "
             f"under runs/<run>/ as a record of what went wrong."
         )
+
+
+# The README names one run summary, in a line that starts `**Latest run:**`. Results runs
+# are `runs/summaries/full-<date>.md`; probes, incidents and slate decisions carry their
+# own prefixes and are never the target. CLAUDE.md, "Writing up a run".
+_LATEST_RUN = re.compile(r"\*\*Latest run:\*\*\s*\[[^\]]*\]\((?P<target>[^)]+)\)")
+_RESULTS_SUMMARY = re.compile(r"^full-(?P<date>\d{4}-\d{2}-\d{2})\.md$")
+
+
+def _latest_run_target() -> str:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    match = _LATEST_RUN.search(readme)
+    assert match, "README.md has no `**Latest run:**` link — the pointer rule cannot hold"
+    return match.group("target")
+
+
+def test_latest_run_points_at_a_results_summary() -> None:
+    """The Latest-run link names a results run, not a probe or an incident.
+
+    `model-alias-drift`, `retry-hang`, `verdict-instability` and `screen-hard` are all
+    newer than the current target and none of them carries results. Aiming the pointer at
+    one sends a reader somewhere with no numbers at all, under a heading that promises
+    them. CLAUDE.md, "Writing up a run".
+    """
+    target = _latest_run_target()
+    path = REPO_ROOT / target
+    assert path.is_file(), f"README's Latest-run link points at {target}, which does not exist"
+    assert _RESULTS_SUMMARY.match(path.name), (
+        f"README's Latest-run link points at {target}. A results run is "
+        f"runs/summaries/full-<date>.md; every other prefix records a probe, an incident "
+        f"or a decision and carries no results."
+    )
+
+
+def test_latest_run_is_the_newest_results_summary() -> None:
+    """No results summary is newer than the one the README points at.
+
+    A stale pointer is worse than a missing one: it sends a reader to superseded numbers
+    sitting under a heading that calls them current. CLAUDE.md requires the pointer to
+    move in the same PR that adds a results summary, and nothing checked that it did.
+    """
+    summaries = sorted(
+        (match.group("date"), path.name)
+        for path in (REPO_ROOT / "runs" / "summaries").glob("full-*.md")
+        if (match := _RESULTS_SUMMARY.match(path.name))
+    )
+    assert summaries, "no runs/summaries/full-<date>.md exists — the glob is wrong"
+    newest_date, newest_name = summaries[-1]
+    pointed = PurePosixPath(_latest_run_target()).name
+    assert pointed == newest_name, (
+        f"README's Latest-run link points at {pointed}, but {newest_name} is newer "
+        f"({newest_date}). Move the pointer in the PR that adds the summary."
+    )
 
 
 # A transcript is a paragraph quoting both sides of an exchange. Matching the *paragraph*
