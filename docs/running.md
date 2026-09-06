@@ -170,8 +170,8 @@ max_tokens)` — which `python -m hup.budget` reports as `ceiling tokens`. Witho
 `max_tokens` that number does not exist, because the overshoot has no size.
 
 `--cost-limit` is deliberately not used here. Inspect records cost only when a model
-carries price data, and all three target models ship none, so the check never runs and the
-flag would look like protection that is not there.
+carries price data, and none of the four models on this slate ship any, so the check never
+runs and the flag would look like protection that is not there.
 
 ## Reproducing the published results
 
@@ -197,10 +197,11 @@ logs record it — and this block reproduces the run rather than improving on it
 Google needs it (see [Pooling repeated passes](#pooling-repeated-passes)); a fresh run
 can leave the other three at the default 10 and go faster for it.
 
-`rounds=1` is the current default, so it could be left off. It is written out because
-this block has to keep regenerating these numbers after the default moves, and because a
-reader comparing it against a later multi-round run should not have to know which depth
-was default on which day.
+`-T rounds=3` is required, not decoration. The default is 1, so dropping it does not
+reproduce this run — it silently runs a one-round experiment and reports it against a
+three-round table. Passing it also lands the depth in the log's `task_args`, so a reader
+comparing this block against a run at another depth does not have to know which default
+was in force on which day.
 
 Everything else comes from the task defaults in `src/hup/task.py`: `token_limit` 10,000,
 `max_tokens` 3,000, `timeout` 120s, `max_retries` 5 and `time_limit` 600s. Sampling is
