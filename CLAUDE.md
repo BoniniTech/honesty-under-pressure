@@ -351,22 +351,23 @@ shell loop survived the stop and kept launching evals for eleven more minutes. V
 `inspect` process survives before believing a run has stopped. Cost, measured rather
 than projected. The 2026-09-04 build-out measured per-sample tokens over 240 samples per
 model per arm. At three rounds: `gpt-5.6-terra` 1,240, `claude-haiku-4-5` 2,012,
-`claude-sonnet-5` 5,177, `gemini-3.8-flash` 6,902. At one round: 339, 519, 1,525, 1,898.
-Billed, that was $10.35 for two passes at three rounds and $3.61 for two at one, so a
-three-round pass costs about **$5.18** and a one-round pass about **$1.81**. The ladder
-costs 3.4x to 3.9x per sample, not the 1.67x the turn ratio predicts, because every turn
-re-sends the whole conversation. The 2026-09-03 escalation probe had put a three-round
-pass at $5.95, 15% high, because its rates came from `q010` and `q016`, the two
-most-argued items in the set. `hup.budget` holds both depths, so an estimate at either
-is a measurement rather than arithmetic. Prices are looked up per run and live nowhere
-in this repo. Cost-capped and configurable; estimate token spend before full runs and
-confirm the budget with the maintainer. Two caps, both in `src/hup/task.py`: a
-per-sample `token_limit` (`--token-limit`) checked between turns, and a per-response
-`max_tokens` (`--max-tokens`) enforced by the provider during generation. The second
-exists because the first can only be checked after a response returns, so a sample is
-billed for the response it had already committed to; `max_tokens` is what bounds that
-overshoot and makes a sweep's ceiling computable. Inspect has no run-level budget: every
-limit it exposes is per-sample, so a whole sweep is bounded by arithmetic
+`claude-sonnet-5` 5,177, `gemini-3.8-flash` 6,902 tokens per sample. At one round, same
+model order: 339, 519, 1,525, 1,898. Billed, that was $10.35 for two passes at three
+rounds and $3.61 for two at one, so a three-round pass costs about **$5.18** and a
+one-round pass about **$1.81**. The ladder costs 3.4x to 3.9x per sample, not the 1.67x
+the turn ratio predicts, because every turn re-sends the whole conversation. The
+2026-09-03 escalation probe had put a three-round pass at $5.95, 15% high, because its
+rates came from `q010` and `q016`, the two most-argued items in the set. `hup.budget`
+holds both depths, so an estimate at either is a measurement rather than arithmetic.
+Prices are looked up per run and live nowhere in this repo. Cost-capped and
+configurable; estimate token spend before full runs and confirm the budget with the
+maintainer. Two caps, both in `src/hup/task.py`: a per-sample `token_limit`
+(`--token-limit`) checked between turns, and a per-response `max_tokens`
+(`--max-tokens`) enforced by the provider during generation. The second exists because
+the first can only be checked after a response returns, so a sample is billed for the
+response it had already committed to; `max_tokens` is what bounds that overshoot and
+makes a sweep's ceiling computable. Inspect has no run-level budget: every limit it
+exposes is per-sample, so a whole sweep is bounded by arithmetic
 (`python -m hup.budget --models ... --passes 4 --rounds 3`), not by anything that fires
 at runtime. Pass `--rounds` to match `-T rounds=`; rounds multiply the bill roughly
 linearly, so `R` and `P` trade against each other directly. Where no mean has been
@@ -383,6 +384,7 @@ that neither finished nor failed (`runs/summaries/retry-hang-2026-08-19.md`).
 definition. `cost_limit` is deliberately unused — Inspect only checks it when the model
 carries price data, and the target models ship none, so it would read as a cap while
 never firing.
+
 ## Repo structure
 ```
 honesty-under-pressure/
