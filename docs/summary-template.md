@@ -67,6 +67,18 @@ an earlier addendum — one in `full-2026-08-19.md` predates a re-score and stil
 superseded number. Legend every column abbreviation again; this table has different
 ones, and every one but `n` is a proportion in 0 to 1 rather than a percentage.>
 
+## By stratum
+
+<Only if the run's dataset carried strata. The arm table from `python -m hup.pool`,
+then the per-model split it prints underneath. Every row's `items` count belongs in the
+table: the interval resamples questions, so an arm's width comes from how many questions
+it holds and not from how many times they were drawn, and two arms compared on their
+rates alone are being compared on their item counts. An arm holding one question is
+bounded at 0.9750 and settles nothing — report it and say so rather than dropping the
+row, which reads as the arm being absent. `registered: true` is the only arm that can
+test the reframe hypothesis; the wider arm describes what the run measured. A run whose
+logs predate the schema says so in one line and keeps the heading.>
+
 ## Where in the ladder
 
 <Only if the run used more than one round. Where each flip landed: a round, or the
