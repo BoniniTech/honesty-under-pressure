@@ -394,6 +394,7 @@ honesty-under-pressure/
   docs/
     method.md          # one question end to end in nine steps; README summarises it
     running.md         # operator guide: setup, caps, pooling, reproduction commands
+    summary-template.md # the fixed section order for a results summary; copy, don't fork
     transcripts.md     # both capitulation transcripts in full; README abridges one
   data/
     questions.jsonl
@@ -416,8 +417,8 @@ honesty-under-pressure/
     test_pool.py
     test_chart.py
     test_rescore.py
-    test_docs.py              # the commands in the live docs, checked against the repo
-    test_task_integration.py  # real task over mockllm; no API key, no network
+    test_docs.py       # the commands in the live docs, checked against the repo
+    test_task_integration.py # real task over mockllm; no API key, no network
   analysis/
     flip-rate.svg      # pre-registered figure, `python -m hup.chart ... --output-dir analysis`
     per-item.svg       # exploratory figure, same command
@@ -475,14 +476,53 @@ follow the same order:
    surfaces, because a reader landing on the standalone page would otherwise read a
    withdrawn item's flip as deference.
 
-Summaries carry two more, because the README publishes one set of numbers and is
+Summaries carry three more, because the README publishes one set of numbers and is
 rewritten per run while a summary accumulates:
 
 7. **Move superseded tables into a collapsible `## History`,** marked as superseded
    there. Never delete one; never edit one in place.
-8. **Keep corrections verbatim, in writing order, indexed above the fold.** The original
-   order keeps every "above" inside a correction resolving. A correction folded into the
-   text it corrects is indistinguishable from never having been wrong.
+8. **Keep corrections verbatim and in writing order.** The original order keeps every
+   "above" inside a correction resolving. A correction folded into the text it corrects
+   is indistinguishable from never having been wrong.
+9. **Above the fold, corrections get an index line each, not their text.** One line: the
+   date, the one clause that changes what the run supports, and a link to the full
+   entry. The bodies live in `## Corrections`, straight after the TL;DR, where they are
+   the first thing a reader meets after the conclusion they modify. `full-2026-09-05.md`
+   shows why the distinction matters — it opens on a 36-line retraction and the TL;DR
+   does not appear until line 49, so the file leads with what it got wrong rather than
+   with what it found. Both are load-bearing and only one of them is the point of the
+   file.
+
+**Section order for a results summary.** Fixed, so that two runs can be read against
+each other and a missing section is visible as an absence rather than an omission nobody
+notices. Skip a section only when the run genuinely has nothing for it, and say so in
+one line rather than dropping the heading.
+
+1. Title, then the plain-language context of rule 1.
+2. The correction index of rule 9, if there are any corrections.
+3. `## TL;DR`
+4. `## Corrections`, full text, if there are any.
+5. `## What was run` — passes, models with resolved ids, commit, `inspect-ai` version,
+   escalation depth, and the glob every number below regenerates from.
+6. The per-item table, then the per-cell table, per rules 3 to 5.
+7. `## Where in the ladder`, if the run used more than one round.
+8. `## Ambiguity by item`
+9. Transcripts, cited per rule 6.
+10. `## What went wrong, and what it cost` — every failed, quarantined or re-run pass,
+    and what each one cost the result. A run with nothing here says so.
+11. `## Spend`
+12. `## What this does not establish`
+13. `## History`, collapsed, per rule 7.
+
+**Name a results summary `full-<date>.md`.** The README's Latest-run pointer is checked
+against that prefix, and everything else — `pilot-`, `buildout-`, `screen-hard-`,
+`escalation-probe-`, `distractor-sweep-`, `slate-selection-`, `model-alias-drift-`,
+`retry-hang-`, `verdict-instability-` — records a probe, an incident or a decision and
+can never own the pointer. `tests/test_docs.py` enforces both halves: the link resolves
+to a `full-` summary, and no `full-` summary is newer than the one it names.
+
+`docs/summary-template.md` is this order as an empty file. Copy it rather than the last
+run's summary, which carries that run's corrections and history.
 
 The README references **exactly one** run summary: the **Latest run** link near the top,
 pointing at the newest summary that carries *results* —
