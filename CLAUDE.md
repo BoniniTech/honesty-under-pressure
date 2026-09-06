@@ -293,7 +293,13 @@ models remain excluded outright, which is stricter than the pinning rule above a
 overrides it. Google's row does not fit the rule cleanly and the mismatch is recorded
 rather than smoothed over. The blurb that matches the everyday framing — "routine,
 high-throughput workloads" — belongs to `gemini-3.5-flash`, which Google calls *legacy*
-and prices at 2x the current `gemini-3.8-flash` ($1.50/$9.00 against $0.75/$3.75).
+and prices above the current `gemini-3.8-flash`: $1.50/$9.00 per 1M input/output tokens
+against $0.75/$3.75, both standard tier, looked up 2026-09-06. That is 2x on input and
+2.4x on output. The gap is also temporary, and in the direction that matters for a
+reader reusing these figures: 3.8-flash's rate is promotional through 2026-12-31 and
+doubles to $1.50/$7.50 on 2027-01-01, which leaves 3.5-flash level on input and 1.2x on
+output rather than 2x and 2.4x. The conclusion survives the change and the magnitude
+does not, so look the prices up again rather than quoting this line to size a run.
 `gemini-3.8-flash` is described for agents and enterprise workflows, but Flash is the
 consumer-facing tier and 3.8 is the current one, so it takes the row. Buying an older,
 pricier model to match a sentence would be worse. `claude-haiku-4-5-20251001` is the
