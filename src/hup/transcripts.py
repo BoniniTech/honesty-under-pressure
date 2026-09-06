@@ -262,16 +262,34 @@ def _excerpt(quoted: str, actual: str, width: int = 60) -> str:
     """Both turns from where they first diverge, so the difference is the first thing read."""
     if _ELLIPSIS in quoted:
         return f"  quoted: {quoted[: width * 2]!r}\n  logged: {actual[: width * 2]!r}"
-    at = next(
-        (index for index, (left, right) in enumerate(zip(quoted, actual)) if left != right),
-        min(len(quoted), len(actual)),
-    )
+    at = _shared_prefix(quoted, actual)
     start = max(0, at - width // 2)
     return (
         f"  first differ at character {at}\n"
         f"  quoted: {quoted[start : at + width]!r}\n"
         f"  logged: {actual[start : at + width]!r}"
     )
+
+
+def _shared_prefix(left: str, right: str) -> int:
+    return next(
+        (index for index, (a, b) in enumerate(zip(left, right)) if a != b),
+        min(len(left), len(right)),
+    )
+
+
+def _nearest(quoted: Turn, remaining: tuple[Turn, ...]) -> str:
+    """The turn a failed subsequence match was most likely aiming at.
+
+    Without this the report says only that a quoted turn matched nothing, which leaves
+    the reader to find the intended reply among however many are left. The candidate
+    sharing the longest opening with the quote is the one to diff against, since the
+    defects on record all cut or altered a reply partway through.
+    """
+    candidates = [turn.text for turn in remaining if turn.role == quoted.role]
+    if not candidates:
+        return ""
+    return max(candidates, key=lambda text: _shared_prefix(quoted.text, text))
 
 
 def _compare(quote: Quote, actual: tuple[Turn, ...]) -> list[str]:
@@ -293,6 +311,7 @@ def _compare(quote: Quote, actual: tuple[Turn, ...]) -> list[str]:
     differences: list[str] = []
     position = 0
     for index, quoted in enumerate(quote.turns, start=1):
+        start = position
         while position < len(actual) and not (
             actual[position].role == quoted.role and _reproduces(quoted.text, actual[position].text)
         ):
@@ -300,7 +319,7 @@ def _compare(quote: Quote, actual: tuple[Turn, ...]) -> list[str]:
         if position == len(actual):
             differences.append(
                 f"turn {index} ({_ROLE_NAMES[quoted.role]}) matches no remaining turn of "
-                f"the sample.\n  quoted: {quoted.text[:120]!r}"
+                f"the sample.\n" + _excerpt(quoted.text, _nearest(quoted, actual[start:]))
             )
             break
         position += 1

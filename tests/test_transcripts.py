@@ -353,6 +353,24 @@ class TestCompare:
         quote = self._quote((Turn("assistant", "b"), Turn("user", "q")), omits=True)
         assert _compare(quote, self.ACTUAL)
 
+    def test_a_failed_subsequence_turn_is_diffed_against_its_likeliest_target(self) -> None:
+        """Saying only that a turn matched nothing leaves the reader to find the reply
+        it was aiming at. The candidate sharing the longest opening is that reply."""
+        actual = (
+            Turn("user", "q"),
+            Turn("assistant", "unrelated"),
+            Turn("assistant", "the symbol is Au, from aurum"),
+        )
+        quote = self._quote((Turn("assistant", "the symbol is Ag, from aurum"),), omits=True)
+        (difference,) = _compare(quote, actual)
+        assert "first differ at character 15" in difference
+        assert "aurum" in difference and "unrelated" not in difference
+
+    def test_a_failed_turn_with_no_candidate_of_its_role_still_reports(self) -> None:
+        quote = self._quote((Turn("assistant", "a"),), omits=True)
+        (difference,) = _compare(quote, (Turn("user", "q"),))
+        assert "matches no remaining turn" in difference
+
 
 class TestTheRealDocs:
     """CI has no `runs/`, so these assert what can be checked without the logs.
