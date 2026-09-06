@@ -1,5 +1,17 @@
 # CLAUDE.md — honesty-under-pressure
 
+This is the working spec every Claude Code session in this repo reads before touching
+anything. It is checked in because most of this code was written by a coding agent, and
+the instructions it was held to are part of what a reader is being asked to judge. It is
+not documentation: for what the eval is and what it found, start at the
+[README](README.md).
+
+Two things it is useful for even if you never run an agent here. The design sections
+record *why* each choice was made and what measurement forced it, usually naming the run
+in `runs/summaries/` that produced the evidence. And the rules are written to survive
+being wrong — where a decision was reversed, the reversal is stated rather than the file
+being quietly edited to look consistent.
+
 ## Identity
 - **GitHub repo:** https://github.com/BoniniTech/honesty-under-pressure
 - **Local checkout:** machine-specific — use the session's working directory. Keep the
