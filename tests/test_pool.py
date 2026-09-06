@@ -101,7 +101,18 @@ def _fake_log(
     )
 
 
-def _fake_sample(sample_id: str = "s1", scores: dict | None = None) -> SimpleNamespace:
+def _fake_sample(
+    sample_id: str = "s1",
+    scores: dict | None = None,
+    metadata: dict | None = None,
+) -> SimpleNamespace:
+    """A stand-in EvalSample.
+
+    `metadata` carries the item's own labels — `stratum` and `registered` — which the
+    scorer never copies into score metadata because they describe the question rather
+    than the answer. Defaults to None, which is what a log written before the stratum
+    schema holds.
+    """
     if scores is None:
         scores = {
             "flip_scorer": SimpleNamespace(
@@ -117,7 +128,7 @@ def _fake_sample(sample_id: str = "s1", scores: dict | None = None) -> SimpleNam
                 },
             )
         }
-    return SimpleNamespace(id=sample_id, scores=scores)
+    return SimpleNamespace(id=sample_id, scores=scores, metadata=metadata)
 
 
 class TestLoadCells:
@@ -279,6 +290,7 @@ def _round_sample(
     round_verdicts: list[str],
     flip_round: int | None = None,
     round_truncated: bool = False,
+    metadata: dict | None = None,
 ) -> SimpleNamespace:
     """A sample as the escalation scorer writes one, for the stand-in log path."""
     return _fake_sample(
@@ -300,6 +312,7 @@ def _round_sample(
                 },
             )
         },
+        metadata=metadata,
     )
 
 
@@ -671,3 +684,237 @@ class TestAmbiguityBreakdownOutput:
         a stand-in that could agree with the code about the wrong field."""
         text = format_pooled(load_cells(two_passes))
         assert "ambiguity by item" in text
+
+
+def _stratum_sample(
+    sample_id: str,
+    stratum: str,
+    *,
+    registered: bool = False,
+    flipped: bool = False,
+) -> SimpleNamespace:
+    """An eligible sample carrying its item's design labels."""
+    return _round_sample(
+        sample_id,
+        flipped=flipped,
+        round_verdicts=["wrong" if flipped else "correct"],
+        flip_round=1 if flipped else None,
+        metadata={"stratum": stratum, "registered": registered},
+    )
+
+
+def _stratum_pooled(samples_by_cell: dict[Cell, list]) -> dict[Cell, PooledCell]:
+    return {
+        cell: PooledCell(cell, pool_module._sample_scores(samples), 1, [len(samples)])
+        for cell, samples in samples_by_cell.items()
+    }
+
+
+class TestStratumBreakdown:
+    """The design axis #33 pre-registered: does an item offering a true reading of the
+    pushback answer draw more flips than one that does not?"""
+
+    _CELL = Cell("m", "plain_contradiction")
+
+    def test_each_stratum_gets_a_row(self) -> None:
+        text = format_pooled(
+            _stratum_pooled(
+                {
+                    self._CELL: [
+                        _stratum_sample("t001", "baseline"),
+                        _stratum_sample("t002", "baseline"),
+                        _stratum_sample("t003", "reframe"),
+                        _stratum_sample("t004", "reframe"),
+                    ]
+                }
+            )
+        )
+        assert "by stratum, pooled across every model and condition:" in text
+        rows = [line for line in text.splitlines() if line.startswith(("baseline", "reframe"))]
+        assert len(rows) == 2, rows
+
+    def test_a_flip_lands_in_its_own_stratum(self) -> None:
+        """The whole axis is worthless if a flip is attributed to the wrong arm."""
+        text = format_pooled(
+            _stratum_pooled(
+                {
+                    self._CELL: [
+                        _stratum_sample("t001", "baseline"),
+                        _stratum_sample("t002", "baseline"),
+                        _stratum_sample("t003", "reframe", flipped=True),
+                        _stratum_sample("t004", "reframe"),
+                    ]
+                }
+            )
+        )
+        baseline = next(line for line in text.splitlines() if line.startswith("baseline "))
+        reframe = next(line for line in text.splitlines() if line.startswith("reframe "))
+        # arm, items, draws, flips, ...
+        assert baseline.split()[1:4] == ["2", "2", "0"], baseline
+        assert reframe.split()[1:4] == ["2", "2", "1"], reframe
+
+    def test_registered_items_are_separable(self) -> None:
+        """A label assigned by reading the logs it came from cannot test the pattern it
+        was derived from, so the pre-registered subset gets its own row."""
+        text = format_pooled(
+            _stratum_pooled(
+                {
+                    self._CELL: [
+                        _stratum_sample("t001", "reframe", registered=False),
+                        _stratum_sample("t002", "reframe", registered=False),
+                        _stratum_sample("t003", "reframe", registered=True),
+                        _stratum_sample("t004", "reframe", registered=True),
+                    ]
+                }
+            )
+        )
+        assert "reframe (registered)" in text
+        wide = next(line for line in text.splitlines() if line.startswith("reframe "))
+        narrow = next(line for line in text.splitlines() if line.startswith("reframe (registered)"))
+        assert wide.split()[1] == "4"
+        assert narrow.split()[2] == "2"
+
+    def test_an_all_registered_stratum_is_not_printed_twice(self) -> None:
+        """The two arms would hold the same samples, and one result shown twice reads as
+        two agreeing measurements."""
+        text = format_pooled(
+            _stratum_pooled(
+                {
+                    self._CELL: [
+                        _stratum_sample("t001", "reframe", registered=True),
+                        _stratum_sample("t002", "reframe", registered=True),
+                    ]
+                }
+            )
+        )
+        assert "reframe (registered)" not in text
+
+    def test_a_one_item_arm_warns_rather_than_reporting_a_rate(self) -> None:
+        """The interval resamples questions, so one question bounds at 0.9750 and settles
+        nothing. Reported, because an arm too small to conclude from is a fact about the
+        run's power rather than a row to suppress."""
+        text = format_pooled(
+            _stratum_pooled(
+                {
+                    self._CELL: [
+                        _stratum_sample("t001", "baseline"),
+                        _stratum_sample("t002", "baseline"),
+                        _stratum_sample("t003", "reframe"),
+                    ]
+                }
+            )
+        )
+        assert "fewer than two questions" in text
+        reframe = next(line for line in text.splitlines() if line.startswith("reframe "))
+        assert "0.9750" in reframe, reframe
+
+    def test_logs_without_strata_say_so_rather_than_reporting_one_arm(self) -> None:
+        """Every sample in the 2026-09-05 published run predates the schema. One unnamed
+        arm would read as a run where every question shared a stratum."""
+        text = format_pooled(
+            _stratum_pooled(
+                {self._CELL: [_round_sample("t001", flipped=False, round_verdicts=["correct"])]}
+            )
+        )
+        assert "by stratum: not recorded in these logs" in text
+        assert "by stratum, pooled across" not in text
+
+    def test_a_pool_mixing_labelled_and_unlabelled_logs_warns(self) -> None:
+        """Strata landed in the same change that retired q038, so a mixed pool spans two
+        dataset versions and every arm in it describes part of the run only."""
+        text = format_pooled(
+            _stratum_pooled(
+                {
+                    self._CELL: [
+                        _stratum_sample("t001", "baseline"),
+                        _stratum_sample("t002", "baseline"),
+                        _round_sample("t003", flipped=False, round_verdicts=["correct"]),
+                    ]
+                }
+            )
+        )
+        assert "(unlabelled)" in text
+        assert "either side of the schema change" in text
+
+    def test_the_per_model_split_appears_with_more_than_one_model(self) -> None:
+        """An arm rate pooled over models describes the questions only where the models
+        agree. Every flip in the 2026-09-05 run came from one model."""
+        first, second = (
+            Cell("model-a", "plain_contradiction"),
+            Cell("model-b", "plain_contradiction"),
+        )
+        text = format_pooled(
+            _stratum_pooled(
+                {
+                    first: [
+                        _stratum_sample("t001", "reframe", flipped=True),
+                        _stratum_sample("t002", "reframe"),
+                    ],
+                    second: [
+                        _stratum_sample("t001", "reframe"),
+                        _stratum_sample("t002", "reframe"),
+                    ],
+                }
+            )
+        )
+        assert "the same arms, split by model:" in text
+        flipping = next(line for line in text.splitlines() if line.startswith("model-a / reframe"))
+        holding = next(line for line in text.splitlines() if line.startswith("model-b / reframe"))
+        # The label is three whitespace-separated tokens, so flips is index 5.
+        assert flipping.split()[5] == "1", flipping
+        assert holding.split()[5] == "0", holding
+
+    def test_a_single_model_run_has_no_split(self) -> None:
+        """It would restate the arm table row for row."""
+        text = format_pooled(
+            _stratum_pooled(
+                {
+                    self._CELL: [
+                        _stratum_sample("t001", "baseline"),
+                        _stratum_sample("t002", "baseline"),
+                    ]
+                }
+            )
+        )
+        assert "the same arms, split by model:" not in text
+
+    def test_the_arm_table_does_not_reuse_a_metric_column_under_another_unit(self) -> None:
+        """`elig` is a proportion in the metric table and the same quantity is a count
+        here, so the count column is headed `draws`. The `elig`/`samples` collision in
+        the round breakdown is the case this rule was written from."""
+        text = format_pooled(
+            _stratum_pooled(
+                {
+                    self._CELL: [
+                        _stratum_sample("t001", "baseline"),
+                        _stratum_sample("t002", "baseline"),
+                    ]
+                }
+            )
+        )
+        lines = text.splitlines()
+        arm_at = next(index for index, line in enumerate(lines) if "by stratum, pooled" in line)
+        metric_header = next(line for line in lines[:arm_at] if line.startswith("cell"))
+        arm_header = next(line for line in lines[arm_at:] if line.startswith("arm"))
+        shared = set(metric_header.split()) & set(arm_header.split())
+        assert shared == set(), (
+            f"the metric table and the arm table both print {sorted(shared)}. The arm "
+            f"table reports counts where the metric table reports proportions, so a "
+            f"shared name is two units under one word."
+        )
+
+    def test_no_printed_line_carries_a_character_a_windows_console_cannot_encode(self) -> None:
+        """cp1252 renders an em-dash as a replacement character, and this output is read
+        in a terminal before it is ever pasted into a summary."""
+        text = format_pooled(
+            _stratum_pooled(
+                {
+                    self._CELL: [
+                        _stratum_sample("t001", "baseline"),
+                        _stratum_sample("t002", "reframe", registered=True),
+                    ]
+                }
+            )
+        )
+        offenders = [line for line in text.splitlines() if any(ord(ch) > 127 for ch in line)]
+        assert not offenders, offenders
