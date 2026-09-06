@@ -20,6 +20,14 @@ from pathlib import Path, PurePosixPath
 
 import pytest
 
+from hup.task import (
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_MAX_TOKENS,
+    DEFAULT_REQUEST_TIMEOUT,
+    DEFAULT_TIME_LIMIT,
+    DEFAULT_TOKEN_LIMIT,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # The historical record. Summaries are never edited in place (CLAUDE.md, "Writing up a
@@ -115,6 +123,36 @@ def test_eval_globs_are_scoped_to_pass_directories(doc: str, module: str, args: 
             f"Use runs/<run>/pass*/*.eval — the wider glob silently pools the runs kept "
             f"under runs/<run>/ as a record of what went wrong."
         )
+
+
+# The reproduction section of docs/running.md quotes the task defaults verbatim, and a
+# reader budgeting a sweep multiplies by them. `token_limit` went from 10,000 to 40,000 in
+# 4f2fd44 on 2026-09-03 and the doc kept saying 10,000 for three days and one published
+# run, which understates a sweep's worst case fourfold.
+_DOCUMENTED_DEFAULTS = (
+    ("token_limit", DEFAULT_TOKEN_LIMIT),
+    ("max_tokens", DEFAULT_MAX_TOKENS),
+    ("timeout", DEFAULT_REQUEST_TIMEOUT),
+    ("max_retries", DEFAULT_MAX_RETRIES),
+    ("time_limit", DEFAULT_TIME_LIMIT),
+)
+
+
+@pytest.mark.parametrize("name,value", _DOCUMENTED_DEFAULTS)
+def test_documented_task_defaults_match_the_source(name: str, value: int) -> None:
+    """A default quoted in the operator guide is the one src/hup/task.py sets.
+
+    The guide says these come from the source, so a reader has no reason to check. The
+    value is read from the module rather than parsed out of it, so renaming a constant
+    fails here as an import error rather than passing against a regex that stopped
+    matching.
+    """
+    documented = (REPO_ROOT / "docs" / "running.md").read_text(encoding="utf-8")
+    assert f"`{name}` {value:,}" in documented, (
+        f"docs/running.md does not document `{name}` as {value:,}, which is what "
+        f"src/hup/task.py sets. Update the reproduction section in the same commit as "
+        f"the default."
+    )
 
 
 # The README names one run summary, in a line that starts `**Latest run:**`. Results runs

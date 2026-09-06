@@ -225,13 +225,14 @@ three-round table. Passing it also lands the depth in the log's `task_args`, so 
 comparing this block against a run at another depth does not have to know which default
 was in force on which day.
 
-Everything else comes from the task defaults in `src/hup/task.py`: `token_limit` 10,000,
-`max_tokens` 3,000, `timeout` 120s, `max_retries` 5 and `time_limit` 600s. Sampling is
-left at each provider's default, so passes differ, which is the point of running four.
-One caveat on `max_tokens`: the run itself used 2,000, raised afterwards as headroom for
-the extra escalation turns. Nothing truncated at either value, so the results reproduce
-at the current default — but the number above is today's setting, not a record of that
-run's.
+Everything else comes from the task defaults in `src/hup/task.py`: `token_limit` 40,000
+tokens per sample, `max_tokens` 3,000 tokens per response, `timeout` 120 seconds per
+request, `max_retries` 5 attempts and `time_limit` 600 seconds of wall clock per sample.
+Sampling is left at each provider's default, so passes differ, which is the point of
+running four. One caveat on `max_tokens`: the run itself used 2,000, raised afterwards
+as headroom for the extra escalation turns. Nothing truncated at either value, so the
+results reproduce at the current default — but the number above is today's setting, not
+a record of that run's.
 
 A scorer change can be applied to logs you already have, without paying for a run:
 
