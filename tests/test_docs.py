@@ -15,11 +15,13 @@ stay wrong.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path, PurePosixPath
 
 import pytest
 
+from hup.dataset import DatasetValidationError, load_questions
 from hup.task import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MAX_TOKENS,
@@ -262,4 +264,86 @@ def test_quoted_transcripts_carry_a_citation(doc: str, line: int, preamble: str)
     assert _CITATION.search(preamble), (
         f"{doc}:{line} quotes a transcript with no `.eval` path, sample id and epoch in "
         f"the lines above it. CLAUDE.md, 'Writing up a run', item 6."
+    )
+
+
+# A dataset example in the docs is a ```json fence holding one questions.jsonl record.
+# The loader refuses the whole file rather than skipping a bad row, so an example missing
+# a field is not merely incomplete — it is a record the repo's own loader rejects. That
+# shipped once, when `stratum` and `registered` were added to the schema and the
+# walkthrough's example kept the five fields it had.
+_JSON_FENCE = re.compile(r"^```json\n(?P<body>.*?)^```", re.MULTILINE | re.DOTALL)
+
+# The walkthrough in docs/method.md. A floor rather than an equality, for the same reason
+# the transcript count is: a matcher that stopped finding it would otherwise pass.
+_EXPECTED_DATASET_EXAMPLES = 1
+
+
+def _dataset_examples() -> list[tuple[str, int, str]]:
+    """Every ```json fence in live Markdown, as (doc path, line number, body)."""
+    found = []
+    for path in _live_docs():
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        text = path.read_text(encoding="utf-8")
+        for match in _JSON_FENCE.finditer(text):
+            line = text[: match.start()].count("\n") + 1
+            found.append((relative, line, match.group("body")))
+    return found
+
+
+def test_docs_contain_a_dataset_example() -> None:
+    """Guards the checks below: a matcher that found nothing would pass silently."""
+    found = _dataset_examples()
+    assert len(found) >= _EXPECTED_DATASET_EXAMPLES, (
+        f"expected at least {_EXPECTED_DATASET_EXAMPLES} ```json fence in live Markdown, "
+        f"matched {len(found)}. Either the walkthrough's example was lost or moved out of "
+        f"a json fence, or the matcher stopped recognising it."
+    )
+
+
+@pytest.mark.parametrize("doc,line,body", _dataset_examples())
+def test_dataset_examples_load_through_the_loader(
+    doc: str, line: int, body: str, tmp_path: Path
+) -> None:
+    """A documented record is one `load_questions` accepts.
+
+    Written to a file and loaded rather than checked field by field, so the example is
+    held to whatever the loader enforces now instead of to a list of field names that
+    drifts alongside it.
+    """
+    try:
+        record = json.loads(body)
+    except json.JSONDecodeError as e:
+        pytest.fail(f"{doc}:{line} is a ```json fence that does not parse as JSON: {e}")
+
+    path = tmp_path / "questions.jsonl"
+    path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    try:
+        loaded = load_questions(path)
+    except DatasetValidationError as e:
+        pytest.fail(
+            f"{doc}:{line} documents a record our own loader rejects: {e}. "
+            f"The docs example moves in the same PR as the schema."
+        )
+    assert loaded == [record]
+
+
+@pytest.mark.parametrize("doc,line,body", _dataset_examples())
+def test_dataset_examples_match_the_real_record(doc: str, line: int, body: str) -> None:
+    """A documented record is the one `data/questions.jsonl` actually holds.
+
+    Loading is not enough on its own: an example can stay valid while the item it names
+    changes underneath it, and a reader has no way to tell. Compared against the real
+    record by id, so a field edited in the dataset fails here rather than leaving the
+    walkthrough describing a sample that no longer exists in that shape.
+    """
+    record = json.loads(body)
+    dataset = {item["id"]: item for item in load_questions()}
+    assert record["id"] in dataset, (
+        f"{doc}:{line} documents item {record['id']!r}, which is not in "
+        f"data/questions.jsonl. Ids are never reused, so a withdrawn item stays gone."
+    )
+    assert record == dataset[record["id"]], (
+        f"{doc}:{line} documents {record['id']!r} as {record}, but data/questions.jsonl "
+        f"holds {dataset[record['id']]}. The example and the dataset move together."
     )
