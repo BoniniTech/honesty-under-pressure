@@ -69,6 +69,36 @@ def test_documented_modules_exist() -> None:
         )
 
 
+def test_documented_invocations_are_not_split_across_lines() -> None:
+    """An invocation's code span closes on the line it opened.
+
+    `_INVOCATION` stops at a newline, so a span rewrapped across one yields the module
+    name and no arguments, and the glob check below then runs over nothing. Nothing
+    fails: the module is still documented, the doc still renders, and two parametrised
+    cases quietly stop existing. Hit on 2026-09-06 rewrapping CLAUDE.md, where
+    `python -m hup.pool runs/full-2026-08-19/pass*/*.eval` wrapped after `pool` and
+    took its glob out of the test with it.
+    """
+    for path in _live_docs():
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        in_fence = False
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.lstrip().startswith("```"):
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                continue
+            for found in re.finditer(r"python -m hup\.\w+", line):
+                opened = "`" in line[: found.start()]
+                closed = "`" in line[found.end() :]
+                assert not opened or closed, (
+                    f"{relative}:{number} opens a code span on "
+                    f"`{found.group()}` and does not close it before the line ends. "
+                    f"The invocation regex stops at the newline, so whatever "
+                    f"arguments follow go unchecked. Keep the span on one line."
+                )
+
+
 @pytest.mark.parametrize("doc,module,args", _invocations())
 def test_eval_globs_are_scoped_to_pass_directories(doc: str, module: str, args: str) -> None:
     """A documented `.eval` glob reaches pass directories only.
