@@ -1,0 +1,47 @@
+#!/bin/sh
+# Check quoted transcripts against the logs they cite, before a doc that carries one
+# is committed.
+#
+# Install it, once per clone:
+#
+#     git config core.hooksPath .githooks
+#
+# Opt-in on purpose. `runs/` is gitignored, so the logs a transcript cites exist only on
+# the machine that paid for the run -- this hook belongs there, and on a clone without
+# them it will refuse every doc commit rather than quietly passing. That refusal is the
+# design: CI cannot run this check at all, so a silent skip here would leave the repo
+# with nothing checking its transcripts anywhere.
+#
+# Two things it does not do. It reads the working tree rather than the index, so a
+# partially staged document is checked as it sits on disk. And it says nothing about
+# lint or tests, which CI already runs on every PR.
+
+set -eu
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR -- '*.md' ':!runs/summaries/**')
+if [ -z "$staged" ]; then
+    exit 0
+fi
+
+if [ -x .venv/Scripts/python.exe ]; then
+    python=.venv/Scripts/python.exe
+elif [ -x .venv/bin/python ]; then
+    python=.venv/bin/python
+else
+    python=python
+fi
+
+echo "pre-commit: checking quoted transcripts against their logs"
+if ! "$python" -X utf8 -m hup.transcripts; then
+    cat >&2 <<'EOF'
+
+pre-commit: a quoted transcript does not match the log it cites.
+
+  MISMATCH   the quote and the log differ. Fix the quote, or declare the
+             abridgement -- see the module docstring in src/hup/transcripts.py.
+  UNCHECKED  the cited log is not on this machine. Restore the run's logs under
+             runs/, or drop the hook with `git config --unset core.hooksPath`.
+
+EOF
+    exit 1
+fi

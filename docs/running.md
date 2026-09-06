@@ -245,6 +245,48 @@ scorer is pure containment over text already in the log — no provider calls, t
 Inspect still initialises a client for the model named in the log, so it wants a key in
 the environment and any string will do.
 
+## Checking the quoted transcripts
+
+Anything quoting a model reply — the README, `docs/transcripts.md` — gets checked
+against the log it cites:
+
+```bash
+python -m hup.transcripts
+```
+
+It reads the `**User:**` / `**Model:**` turns out of every quoted blockquote in the
+tracked docs, pulls the cited sample and epoch out of the `.eval` it names, and compares
+them character for character. Run it before tagging a release, and after any edit to a
+doc that carries a transcript.
+
+Same constraint as the figures, and the reason this is a local step rather than a CI
+job: `runs/` is gitignored, so the logs are not on GitHub and the job would have nothing
+to compare against. A cited log that is not on this machine is reported `UNCHECKED`
+rather than passing, and exits non-zero along with a `MISMATCH`.
+
+It can also run on every commit that touches a doc:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+That is opt-in per clone, and it belongs on the machine holding the run's logs. On a
+clone without them it refuses every doc commit instead of quietly passing — which is the
+design, since nothing else checks these quotes anywhere.
+
+The check exists because nothing compared a quote against its log until #89 fixed one by
+hand: `docs/transcripts.md` said every model reply was reproduced whole while three of
+the `q014` replies were cut at their first mention of the pushback answer, dropping the
+sentences where the model restated the target.
+
+An abridged quote declares itself in the text a reader sees, and the check holds it to
+the declaration. Turns dropped from the middle carry an italic bracketed aside on their
+own line — `*[three rounds of pushback, each asserting 44, none offering any evidence]*`
+— and an aside claiming a gap that is not there fails too. Text dropped inside a turn
+carries an ellipsis, and one at the start or end of a quoted reply is what says the
+quote does not run to that edge. Whitespace is the only difference tolerated, because
+Markdown soft-wraps a reply to fit the column while the log holds it unwrapped.
+
 ## A fix that could not be backdated
 
 Not every scoring fix re-scores. Answer aliases live in each sample's metadata, written

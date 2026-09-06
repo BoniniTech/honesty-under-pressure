@@ -399,6 +399,8 @@ honesty-under-pressure/
   pyproject.toml       # uv-managed; pinned deps
   .github/workflows/
     ci.yml             # lint + tests on every PR; no secrets, no provider calls
+  .githooks/
+    pre-commit         # the transcript check CI cannot run; opt in per clone
   docs/
     method.md          # one question end to end in nine steps; README summarises it
     running.md         # operator guide: setup, caps, pooling, reproduction commands
@@ -417,6 +419,7 @@ honesty-under-pressure/
     pool.py            # pool metrics across repeated passes; no provider calls
     chart.py           # render the result figures as SVG; no deps, no provider calls
     rescore.py         # re-score existing logs with the current scorer; no provider calls
+    transcripts.py     # check quoted transcripts against their logs; no provider calls
   tests/
     test_scorers.py
     test_dataset.py
@@ -425,6 +428,7 @@ honesty-under-pressure/
     test_pool.py
     test_chart.py
     test_rescore.py
+    test_transcripts.py
     test_docs.py       # the commands in the live docs, checked against the repo
     test_task_integration.py # real task over mockllm; no API key, no network
   analysis/
@@ -491,7 +495,13 @@ follow the same order:
    is for. A transcript that leaves the README for `docs/transcripts.md` carries its own
    caveats with it: the `q038` retirement notice sits beside that transcript on both
    surfaces, because a reader landing on the standalone page would otherwise read a
-   withdrawn item's flip as deference.
+   withdrawn item's flip as deference. The citation is what `python -m hup.transcripts`
+   reads to find the sample, so it is load-bearing rather than decorative: run that
+   after editing any doc that carries a transcript, and before tagging. It compares the
+   quote to the log character for character, and holds an abridged one to the
+   declaration it makes in the text — an italic bracketed aside for dropped turns, an
+   ellipsis for text dropped inside one. Nothing checks this in CI, because `runs/` is
+   gitignored and the job would have nothing to compare against.
 
 Summaries carry three more, because the README publishes one set of numbers and is
 rewritten per run while a summary accumulates:
@@ -627,6 +637,13 @@ though it were the newest one.
 `releases/latest/download/report.md` keeps serving the previous release's report until a
 new release exists, so a missed one leaves a URL that looks current and is not. That is
 worse than having no such URL. Tag and release together, in the same session.
+
+**Two local checks run before the tag,** both for the same reason: CI cannot run either,
+because `runs/` is gitignored and the logs a check would read are not on GitHub.
+`python -m hup.chart ... --output-dir analysis` regenerates the committed figures, and
+`python -m hup.transcripts` compares every quoted transcript against the log it cites.
+The second must report every transcript verbatim — an `UNCHECKED` line means the run's
+logs are not on the machine doing the release, which is not a pass.
 
 `report.md` is the run summary with its two image links rewritten, and nothing else. The
 in-tree copy uses `../../analysis/*.svg`, which resolves in the repo and is dead in a
