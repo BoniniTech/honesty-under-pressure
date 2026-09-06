@@ -467,8 +467,13 @@ follow the same order:
    1.0000.
 4. **Per-item table before the per-cell table.** A cell rate reads as a uniform
    tendency, and six flips from two of forty questions is not one.
-5. **Legend every column abbreviation, one line each, on every table.** `ci_lo`, `elig`
-   and `exc_wrong` are not self-describing.
+5. **Legend every column abbreviation, one line each, on every table, and say what unit
+   it is in.** `ci_lo`, `elig` and `exc_wrong` are not self-describing, and neither is a
+   bare `0.0443` — every rate here is a proportion in 0 to 1 rather than a percentage,
+   and a table of counts sitting under a table of rates has to say so. `eligible` is the
+   case that proves it: `python -m hup.pool` prints it as a proportion in the metric
+   table and as a count of samples in the round breakdown, so the same word carries two
+   units two tables apart and only the legend can separate them.
 6. **Cite every quoted transcript** — `.eval` path, sample id, epoch. As text, not a
    link: the logs are gitignored, so a link is dead for exactly the reader the citation
    is for. A transcript that leaves the README for `docs/transcripts.md` carries its own

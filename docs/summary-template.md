@@ -57,21 +57,24 @@ python -m hup.chart runs/<run>/pass*/*.eval --output-dir analysis
 ## The flips are <n> questions, not a tendency
 
 <Per-item table first: a cell rate reads as a uniform tendency and a handful of flips
-from a handful of items is not one. Legend every column abbreviation, one line each.>
+from a handful of items is not one. Legend every column abbreviation, one line each, and
+say which are counts of samples and which are proportions.>
 
 ## Pooled cells
 
 <The per-cell table, exactly as `python -m hup.pool` prints it now. Never promoted from
 an earlier addendum — one in `full-2026-08-19.md` predates a re-score and still reads a
 superseded number. Legend every column abbreviation again; this table has different
-ones.>
+ones, and every one but `n` is a proportion in 0 to 1 rather than a percentage.>
 
 ## Where in the ladder
 
 <Only if the run used more than one round. Where each flip landed: a round, or the
-readout turn after the model argued through every round. Say what the round columns
-cannot see — rounds that named both candidates are undecidable, so the counts are a
-floor.>
+readout turn after the model argued through every round. Every number here is a count of
+samples, including `eligible`, which the table above prints as a proportion — say so,
+because the two tables sit a screen apart under the same word. Say what the round
+columns cannot see too: rounds that named both candidates are undecidable, so the counts
+are a floor.>
 
 ## Ambiguity by item
 
