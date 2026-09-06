@@ -30,11 +30,11 @@ from hup.task import (
     DEFAULT_TOKEN_LIMIT,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+# Which documents count as live is `hup.transcripts`' definition rather than a second
+# copy of it here. Two copies of one glob is the shape of defect this file exists for.
+from hup.transcripts import live_docs
 
-# The historical record. Summaries are never edited in place (CLAUDE.md, "Writing up a
-# run"), so a command quoted in one is evidence rather than instruction.
-_EXCLUDED_DIRS = ("runs/summaries",)
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # `python -m hup.<module> <args...>`, stopping at a closing backtick or end of line so a
 # prose mention inside a sentence yields its module name and no arguments.
@@ -43,23 +43,10 @@ _INVOCATION = re.compile(r"python -m hup\.(?P<module>\w+)(?P<args>[^\n`]*)")
 _EVAL_ARG = re.compile(r"\S*\.eval\b")
 
 
-def _live_docs() -> list[Path]:
-    docs = [
-        path
-        for path in sorted(REPO_ROOT.rglob("*.md"))
-        if ".venv" not in path.parts
-        and not any(
-            excluded in path.relative_to(REPO_ROOT).as_posix() for excluded in _EXCLUDED_DIRS
-        )
-    ]
-    assert docs, "found no live Markdown to check — the glob is wrong, not the docs"
-    return docs
-
-
 def _invocations() -> list[tuple[str, str, str]]:
     """Every documented `python -m hup.*` call, as (doc path, module, argument string)."""
     found = []
-    for path in _live_docs():
+    for path in live_docs():
         relative = path.relative_to(REPO_ROOT).as_posix()
         for match in _INVOCATION.finditer(path.read_text(encoding="utf-8")):
             found.append((relative, match.group("module"), match.group("args")))
@@ -89,7 +76,7 @@ def test_documented_invocations_are_not_split_across_lines() -> None:
     `python -m hup.pool runs/full-2026-08-19/pass*/*.eval` wrapped after `pool` and
     took its glob out of the test with it.
     """
-    for path in _live_docs():
+    for path in live_docs():
         relative = path.relative_to(REPO_ROOT).as_posix()
         in_fence = False
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
@@ -210,63 +197,6 @@ def test_latest_run_is_the_newest_results_summary() -> None:
     )
 
 
-# A transcript is a paragraph quoting both sides of an exchange. Matching the *paragraph*
-# rather than a line is deliberate: the defect this guards against welded the citation
-# onto the first quoted line (`Source: > **User:** How many...`), which no line-anchored
-# pattern sees as a quote at all, so it would have been skipped rather than failed.
-_USER_TURN = "**User:**"
-_MODEL_TURN = "**Model:**"
-
-# `<path>.eval`, then a sample id, then an epoch, in that order. CLAUDE.md, "Writing up a
-# run", item 6. The path may wrap, so the separator is any run of whitespace.
-_CITATION = re.compile(r"\.eval`?,?\s*sample `\w+`, epoch \d+")
-
-# Two transcripts in docs/transcripts.md and one abridged in the README. Asserted as a
-# floor so that losing one, or a matcher that stops recognising one, fails loudly instead
-# of quietly checking fewer things.
-_EXPECTED_TRANSCRIPTS = 3
-
-
-def _transcripts() -> list[tuple[str, int, str]]:
-    """Every quoted transcript in live Markdown, as (doc path, line number, preceding text)."""
-    found = []
-    for path in _live_docs():
-        relative = path.relative_to(REPO_ROOT).as_posix()
-        text = path.read_text(encoding="utf-8")
-        offset = 1
-        for block in text.split("\n\n"):
-            is_quote = any(line.lstrip().startswith(">") for line in block.split("\n"))
-            if is_quote and _USER_TURN in block and _MODEL_TURN in block:
-                preamble = "\n".join(text[: text.index(block)].split("\n")[-5:])
-                found.append((relative, offset, preamble))
-            offset += block.count("\n") + 2
-    return found
-
-
-def test_docs_contain_every_known_transcript() -> None:
-    """Guards the check below: a matcher that found nothing would pass silently."""
-    found = _transcripts()
-    assert len(found) >= _EXPECTED_TRANSCRIPTS, (
-        f"expected at least {_EXPECTED_TRANSCRIPTS} quoted transcripts, matched {len(found)}: "
-        f"{[f'{doc}:{line}' for doc, line, _ in found]}. Either a transcript was lost, or the "
-        f"matcher stopped recognising one — both mean this file is checking less than it says."
-    )
-
-
-@pytest.mark.parametrize("doc,line,preamble", _transcripts())
-def test_quoted_transcripts_carry_a_citation(doc: str, line: int, preamble: str) -> None:
-    """A quoted transcript names the log it came from, its sample and its epoch.
-
-    The logs are gitignored, so a reader cannot go and look — the citation is the only
-    thing tying a quote to the run that produced it. A docs move dropped one on
-    2026-09-05 and green CI said nothing, because nothing compared them.
-    """
-    assert _CITATION.search(preamble), (
-        f"{doc}:{line} quotes a transcript with no `.eval` path, sample id and epoch in "
-        f"the lines above it. CLAUDE.md, 'Writing up a run', item 6."
-    )
-
-
 # A dataset example in the docs is a ```json fence holding one questions.jsonl record.
 # The loader refuses the whole file rather than skipping a bad row, so an example missing
 # a field is not merely incomplete — it is a record the repo's own loader rejects. That
@@ -275,14 +205,15 @@ def test_quoted_transcripts_carry_a_citation(doc: str, line: int, preamble: str)
 _JSON_FENCE = re.compile(r"^```json\n(?P<body>.*?)^```", re.MULTILINE | re.DOTALL)
 
 # The walkthrough in docs/method.md. A floor rather than an equality, for the same reason
-# the transcript count is: a matcher that stopped finding it would otherwise pass.
+# the transcript count in tests/test_transcripts.py is: a matcher that stopped finding
+# it would otherwise pass.
 _EXPECTED_DATASET_EXAMPLES = 1
 
 
 def _dataset_examples() -> list[tuple[str, int, str]]:
     """Every ```json fence in live Markdown, as (doc path, line number, body)."""
     found = []
-    for path in _live_docs():
+    for path in live_docs():
         relative = path.relative_to(REPO_ROOT).as_posix()
         text = path.read_text(encoding="utf-8")
         for match in _JSON_FENCE.finditer(text):
