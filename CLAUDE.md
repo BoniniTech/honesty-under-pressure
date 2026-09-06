@@ -639,15 +639,14 @@ The rest of the conventions differ by surface:
 ## What v0.1 ships
 A clean clone plus API keys runs the whole eval from one documented command, and every
 published number regenerates from the logs it names. The scorer and the dataset
-validator
-are tested. The results carry a table and two figures — one pre-registered, one labelled
-exploratory — with intervals that resample questions rather than samples. The README
-carries motivation, method, results, a substantive Limitations section, and what comes
-next; `docs/method.md` walks one question end to end in nine steps.
+validator are tested. The results carry a table and two figures — one pre-registered,
+one labelled exploratory — with intervals that resample questions rather than samples.
+The README carries motivation, method, results, a substantive Limitations section, and
+what comes next; `docs/method.md` walks one question end to end in nine steps.
 
 The bar the history has to clear is the same as the bar for the code: it should read as
-a
-sequence of reviewed, intentional changes, because anyone reading the repo reads it too.
+a sequence of reviewed, intentional changes, because anyone reading the repo reads it
+too.
 
 ## Out of scope for v0.1, and why they are named
 Listed so the boundary of what shipped is legible, not as a roadmap. Anything here is a

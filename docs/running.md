@@ -1,8 +1,8 @@
 # Running the eval
 
-Everything needed to run `honesty-under-pressure` yourself: environment setup, the
-cost and duration caps, the failure modes worth knowing before you spend money, and
-the exact commands that regenerate the published numbers.
+Everything needed to run `honesty-under-pressure` yourself: environment setup, the cost
+and duration caps, the failure modes worth knowing before you spend money, and the exact
+commands that regenerate the published numbers.
 
 For what the eval measures and what it found, see the [README](../README.md).
 
@@ -46,16 +46,13 @@ inspect eval src/hup/task.py --model anthropic/claude-haiku-4-5-20251001 -T roun
 ```
 
 Each round adds a turn to every sample, so three rounds is five turns. It is **not**
-1.67x
-the tokens: measured across the v0.2 slate, three rounds costs 3.4x to 3.9x one round,
-because every turn re-sends the whole conversation so far and input grows much faster
-than
-the turn count. A depth above three is refused rather than clamped — repeating a rung
-would
-report an escalation the run did not apply. Pass it explicitly even when you want the
-default: it lands in the log's `task_args`, so the depth travels with the results
-instead
-of having to be inferred from whichever version of the solver was checked out.
+1.67x the tokens: measured across the v0.2 slate, three rounds costs 3.4x to 3.9x one
+round, because every turn re-sends the whole conversation so far and input grows much
+faster than the turn count. A depth above three is refused rather than clamped —
+repeating a rung would report an escalation the run did not apply. Pass it explicitly
+even when you want the default: it lands in the log's `task_args`, so the depth travels
+with the results instead of having to be inferred from whichever version of the solver
+was checked out.
 
 `--model` takes any Inspect-supported `<provider>/<model>` id. **Use a pinned version,
 never a floating alias.** `google/gemini-flash-latest` resolved to `gemini-3.6-flash` on
@@ -79,20 +76,16 @@ loader on `inspect-ai==0.3.255`.
 
 **Running non-interactively? Pass `--display plain`.** `--display` defaults to `full`, a
 rich TUI that hangs when stdout is not a terminal — backgrounded, redirected to a file,
-or
-piped into a script. The eval starts, writes its journal entry, and then sits there: no
-error, no timeout, process still alive. A script chaining several runs with output to
+or piped into a script. The eval starts, writes its journal entry, and then sits there:
+no error, no timeout, process still alive. A script chaining several runs with output to
 `/dev/null` will hang on the first and never reach the rest.
 
 It is worth knowing what that looks like from disk, because it is easy to misread.
-Inspect
-flushes samples to the `.eval` only when a task *completes*, so a run killed part-way
-and
-one that never started are indistinguishable — both leave an archive holding nothing but
-`_journal/start.json`, and both read back as `status='started'` with zero samples. "Zero
-samples after thirty minutes" is therefore not evidence of a stall, and reading it that
-way
-costs an afternoon.
+Inspect flushes samples to the `.eval` only when a task *completes*, so a run killed
+part-way and one that never started are indistinguishable — both leave an archive
+holding nothing but `_journal/start.json`, and both read back as `status='started'` with
+zero samples. "Zero samples after thirty minutes" is therefore not evidence of a stall,
+and reading it that way costs an afternoon.
 
 ## Pooling repeated passes
 
@@ -109,20 +102,18 @@ Under the metric table it prints where each cell's flips happened — the round 
 first named the pushback answer on, with a separate column for the ones that argued
 through every round and only conceded when asked for the answer alone. Logs written
 before escalation existed carry no round data and say so, rather than printing zeros
-that
-would read as a run where no flip landed on any round.
+that would read as a run where no flip landed on any round.
 
 Pooling passes that ran **different escalation depths** into one cell is refused. A
 one-round pass and a three-round pass produce the same cells, the same sample counts and
 the same columns, so nothing in the table would show that the flip rate describes
 neither.
 
-Glob the pass directories, not `runs/full-2026-09-05/*.eval`. A run directory also
-holds the logs of whatever went wrong — here `credit-exhausted/` for the two passes the
+Glob the pass directories, not `runs/full-2026-09-05/*.eval`. A run directory also holds
+the logs of whatever went wrong — here `credit-exhausted/` for the two passes the
 Anthropic balance cut short, and `failed-timeout/` for one condition that died on
 `RetryError(TimeoutError)` and was re-run. Those are kept on purpose and must stay out
-of
-any pooled number. The narrower glob excludes them by construction; the wider one
+of any pooled number. The narrower glob excludes them by construction; the wider one
 silently includes them.
 
 Google needs throttling. At the default 10 concurrent connections `gemini` returns
@@ -148,19 +139,14 @@ projects spend per model from measured means rather than one blended figure. The
 differ by more than 5x per sample, so a blended average describes none of them.
 
 `--rounds` has to match the `-T rounds=` the run will use, since rounds multiply the
-bill
-and trade directly against passes. Means are recorded per depth, so a projection at a
-measured depth is a measurement: the estimate for the published four-pass run was
-7,358,880
-tokens against 7,374,223 actually billed, 0.2% low. At a depth nothing was measured at,
-the
-estimate scales the nearest measured mean by the turn-count ratio, marks the row
-`SCALED`,
-and says which way it is wrong — scaling up understates, so the row is a floor; scaling
-down
-from a deeper measurement overstates, so it is a ceiling. Turn-count arithmetic alone
-would
-have projected 3,424,800 tokens for that run, understating the bill by 2.15x.
+bill and trade directly against passes. Means are recorded per depth, so a projection at
+a measured depth is a measurement: the estimate for the published four-pass run was
+7,358,880 tokens against 7,374,223 actually billed, 0.2% low. At a depth nothing was
+measured at, the estimate scales the nearest measured mean by the turn-count ratio,
+marks the row `SCALED`, and says which way it is wrong — scaling up understates, so the
+row is a floor; scaling down from a deeper measurement overstates, so it is a ceiling.
+Turn-count arithmetic alone would have projected 3,424,800 tokens for that run,
+understating the bill by 2.15x.
 
 A run is bounded in three ways beyond spend, because Inspect leaves all three unset and
 an unbounded run can hang rather than fail: `--timeout` on a single request,
@@ -176,14 +162,12 @@ it, since a partial sweep weights whichever items ran first.
 Each sample carries a per-sample `token_limit` (`DEFAULT_TOKEN_LIMIT` in
 `src/hup/task.py`), overridable with `--token-limit`. That bounds one runaway sample; it
 is **not** a budget for the run. Inspect has no run-level cap — every limit it exposes
-is
-per-sample — so a sweep costs about `samples x token_limit` at worst, and the only
+is per-sample — so a sweep costs about `samples x token_limit` at worst, and the only
 run-scoped control is `--limit`, which caps how many samples execute.
 
 The limit is checked between turns rather than mid-generation, so a sample is billed for
 the response it had already committed to. Verified against `gpt-4o-mini`: a 50-token
-limit
-halted a sample after one turn instead of three, having used 114 tokens.
+limit halted a sample after one turn instead of three, having used 114 tokens.
 
 A second cap bounds that overshoot. `DEFAULT_MAX_TOKENS` (also `src/hup/task.py`,
 overridable with `--max-tokens`) is sent with the request and enforced by the provider
@@ -196,21 +180,20 @@ overridable with `--max-tokens`) is sent with the request and enforced by the pr
 | catches | turns that add up to too much | one response that runs away |
 | can overshoot | yes, by one response | no |
 
-Together they give a sweep a real upper bound — `samples x (token_limit + turns x
-max_tokens)` — which `python -m hup.budget` reports as `ceiling tokens`. Without
-`max_tokens` that number does not exist, because the overshoot has no size.
+Together they give a sweep a real upper bound —
+`samples x (token_limit + turns x max_tokens)` — which `python -m hup.budget` reports as
+`ceiling tokens`. Without `max_tokens` that number does not exist, because the overshoot
+has no size.
 
 `--cost-limit` is deliberately not used here. Inspect records cost only when a model
 carries price data, and none of the four models on this slate ship any, so the check
-never
-runs and the flag would look like protection that is not there.
+never runs and the flag would look like protection that is not there.
 
 ## Reproducing the published results
 
 Four passes at three rounds, on `inspect-ai==0.3.255` as pinned in `pyproject.toml`.
-Each
-pass is four `inspect eval` invocations, one per model, and each writes three logs, one
-per pressure condition:
+Each pass is four `inspect eval` invocations, one per model, and each writes three logs,
+one per pressure condition:
 
 ```bash
 for pass in 1 2 3 4; do
@@ -225,10 +208,8 @@ python -m hup.chart runs/full-2026-09-05/pass*/*.eval --output-dir analysis
 
 `python -m hup.chart` writes the two figures the README embeds. Both are committed,
 because `runs/` is gitignored and regenerating them from a clean clone means paying for
-a
-fresh run. `--output-dir` has no default, so charting some other run cannot overwrite
-the
-published figures by omitting it.
+a fresh run. `--output-dir` has no default, so charting some other run cannot overwrite
+the published figures by omitting it.
 
 `--display plain` is required, not cosmetic: `inspect eval` defaults to a rich TUI that
 hangs when stdout is not a terminal, with no error and no timeout.
@@ -268,15 +249,13 @@ the environment and any string will do.
 Not every scoring fix re-scores. Answer aliases live in each sample's metadata, written
 when the sample ran, so a log recorded before the field existed carries no aliases and
 re-scoring reads none. An alias added today cannot reach a sample that ran yesterday,
-and
-`python -m hup.rescore` will not tell you it fell short — it reads the metadata that is
-there.
+and `python -m hup.rescore` will not tell you it fell short — it reads the metadata that
+is there.
 
 The distinction generalises: a change to the scorer's own logic backdates, a change to
 what the dataset records about a sample does not. Aliases sit in the dataset because
-that
-is where a human can review them, and the cost of that choice is exactly this. Anything
-in the second class needs a fresh run to take effect.
+that is where a human can review them, and the cost of that choice is exactly this.
+Anything in the second class needs a fresh run to take effect.
 
 Inspect does not record the command line, so the block above is reconstructed from what
 the logs say was in force rather than copied from a shell history. Read the per-call
