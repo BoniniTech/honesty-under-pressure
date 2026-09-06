@@ -62,6 +62,18 @@ class PooledCell:
 
 
 def _sample_scores(log_samples: list) -> list[SampleScore]:
+    """Every sample's one score, carrying the sample's own metadata alongside it.
+
+    `sample_metadata` is what makes a stratum breakdown possible. The scorer writes
+    verdicts and flags into *score* metadata and never copies the item's `stratum` or
+    `registered` labels across, because those describe the question rather than the
+    answer. They live in sample metadata, written when the sample runs, so pooling has
+    to read them from the log rather than from the score.
+
+    The consequence is that no re-score can backfill them: a log recorded before the
+    labels existed carries samples that never had them. `format_stratum_breakdown` says
+    so in words rather than reporting one unlabelled arm.
+    """
     scores: list[SampleScore] = []
     for sample in log_samples:
         if not sample.scores:
@@ -76,6 +88,7 @@ def _sample_scores(log_samples: list) -> list[SampleScore]:
             SampleScore(
                 score=Score(value=evaluated.value, metadata=evaluated.metadata),
                 sample_id=sample.id,
+                sample_metadata=sample.metadata,
             )
         )
     return scores
