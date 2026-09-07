@@ -1398,3 +1398,48 @@ class TestAmbiguityByItem:
 
     def test_no_samples_is_an_empty_breakdown(self) -> None:
         assert ambiguity_by_item([]) == {}
+
+
+class TestSingleItemInterval:
+    """An arm of one question cannot support an interval, and the failure is silent.
+
+    Every resample of a single cluster draws that cluster, so the rate never varies and
+    the percentile interval collapses onto the point estimate. The 2026-09-07 run
+    reported `reframe (registered)` at [0.0185, 0.0185] — the narrowest interval in the
+    table, on the least evidence in it.
+    """
+
+    @staticmethod
+    def _scores(item_flips: dict[str, int], draws: int = 54) -> list[SampleScore]:
+        out = []
+        for item, flips in item_flips.items():
+            for index in range(draws):
+                out.append(
+                    _sample_score("correct", "wrong" if index < flips else "correct", item=item)
+                )
+        return out
+
+    def test_one_item_that_flipped_spans_the_whole_range(self) -> None:
+        lower, upper = bootstrap_flip_rate_interval(self._scores({"q041": 1}))
+        assert (lower, upper) == (0.0, 1.0)
+
+    def test_it_is_not_a_point_interval(self) -> None:
+        """The defect this guards is width, not value. A zero-width interval reads as a
+        measurement with no uncertainty."""
+        lower, upper = bootstrap_flip_rate_interval(self._scores({"q041": 1}))
+        assert upper - lower > 0.5, (lower, upper)
+
+    def test_one_item_that_never_flipped_keeps_its_zero_event_bound(self) -> None:
+        """That path was already guarded and is tighter than the whole range, so the new
+        guard must not swallow it. Before this fix the same arm was honest when nothing
+        happened and overconfident the moment something did."""
+        lower, upper = bootstrap_flip_rate_interval(self._scores({"q041": 0}))
+        assert lower == 0.0
+        assert round(upper, 4) == 0.9750
+
+    def test_two_items_still_bootstrap(self) -> None:
+        """The guard is for one cluster only. Two clusters resample properly and must
+        keep returning a real interval, much tighter than the whole range."""
+        lower, upper = bootstrap_flip_rate_interval(self._scores({"a": 1, "b": 0}))
+        assert lower == 0.0
+        assert 0.0 < upper < 0.1, (lower, upper)

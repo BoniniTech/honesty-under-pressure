@@ -18,6 +18,7 @@ import pytest
 from inspect_ai.scorer import CORRECT, INCORRECT, NOANSWER, SampleScore, Score
 
 from hup.chart import (
+    ArmResult,
     CellResult,
     _escape,
     _model_label,
@@ -33,7 +34,7 @@ from hup.chart import (
     main,
     per_item_figure,
 )
-from hup.pool import Cell, PooledCell
+from hup.pool import Arm, Cell, PooledCell
 
 
 def _score(initial: str, final: str, item: str) -> SampleScore:
@@ -521,3 +522,41 @@ class TestChartSurvivesARunWithNoFlips:
         assert (out / "by-stratum.svg").exists()
         assert not (out / "per-item.svg").exists()
         assert "skipped per-item.svg" in capsys.readouterr().out
+
+
+class TestSingleItemArmsAreNotDrawn:
+    """An arm spanning 0 to 1 would set the axis for every other row.
+
+    Three real comparisons squashed to make room for a measurement that is not one.
+    Dropped from the plot and named in the footer, so the reader is told the arm exists
+    and told why it is not there.
+    """
+
+    def test_the_arm_is_omitted_and_named(self) -> None:
+        results = [
+            ArmResult(Arm("baseline", False), 31, 1670, 1, 0.0006, 0.0, 0.0018, False),
+            ArmResult(Arm("reframe", False), 9, 485, 4, 0.0082, 0.0, 0.0166, False),
+            ArmResult(Arm("reframe", True), 1, 54, 1, 0.0185, 0.0, 1.0, False),
+        ]
+        svg = by_stratum_figure(results)
+        assert "k=31" in svg and "k=9" in svg
+        assert "one question supports no interval" in svg
+        assert "reframe (registered) (k=1)" in svg
+
+    def test_the_axis_is_not_blown_out_by_it(self) -> None:
+        """The whole reason it is dropped. With the k=1 arm drawn, axis_max is 1.0 and
+        the two informative rows collapse against the left edge."""
+        results = [
+            ArmResult(Arm("baseline", False), 31, 1670, 1, 0.0006, 0.0, 0.0018, False),
+            ArmResult(Arm("reframe", False), 9, 485, 4, 0.0082, 0.0, 0.0166, False),
+            ArmResult(Arm("reframe", True), 1, 54, 1, 0.0185, 0.0, 1.0, False),
+        ]
+        svg = by_stratum_figure(results)
+        assert ">1.00<" not in svg, "the axis reached 1.00, so the k=1 arm still sets it"
+        assert ElementTree.fromstring(svg).tag.endswith("svg")
+
+    def test_a_figure_of_only_single_item_arms_refuses(self) -> None:
+        """Drawing nothing under a caption that says it compares the arms is worse than
+        drawing no figure."""
+        with pytest.raises(ValueError, match="fewer than two questions"):
+            by_stratum_figure([ArmResult(Arm("reframe", True), 1, 54, 1, 0.0185, 0.0, 1.0, False)])

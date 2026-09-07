@@ -513,6 +513,20 @@ def by_stratum_figure(results: list[ArmResult], *, axis_max: float | None = None
             "sample metadata is written when the sample runs, so only a fresh run has it"
         )
 
+    # An arm of one question supports no interval, so it spans 0 to 1 and would set the
+    # axis for every other row, squashing three real comparisons to make room for a
+    # measurement that is not one. Dropped from the plot and named in the footer, which
+    # is the opposite of the empty-row failure the dot-and-interval form exists to
+    # prevent: the reader is told the arm exists and told why it is not drawn.
+    omitted = [result for result in results if result.items < 2]
+    results = [result for result in results if result.items >= 2]
+    if not results:
+        raise ValueError(
+            "every labelled arm holds fewer than two questions, so none of them supports "
+            "an interval and the figure would compare nothing"
+        )
+
+    height_extra = 14.0 if omitted else 0.0
     largest = max((r.upper for r in results if not math.isnan(r.upper)), default=0.0)
     axis_max = (
         max(_MIN_AXIS_MAX, math.ceil(largest / _AXIS_STEP) * _AXIS_STEP)
@@ -522,7 +536,7 @@ def by_stratum_figure(results: list[ArmResult], *, axis_max: float | None = None
     left, right = 232.0, 700.0
     top = 74.0
     row_height = 30.0
-    width, height = 780.0, top + row_height * len(results) + 88.0
+    width, height = 780.0, top + row_height * len(results) + 88.0 + height_extra
     span = right - left
 
     def x_of(value: float) -> float:
@@ -645,6 +659,19 @@ def by_stratum_figure(results: list[ArmResult], *, axis_max: float | None = None
             anchor="start",
         )
     )
+    if omitted:
+        parts.append(
+            _text(
+                24,
+                footer + 42,
+                "Not drawn, because one question supports no interval: "
+                + ", ".join(f"{result.arm} (k={result.items})" for result in omitted)
+                + ". The table reports it.",
+                size=10.5,
+                fill=_MUTED,
+                anchor="start",
+            )
+        )
     parts.append("</svg>")
     return "\n".join(parts) + "\n"
 
