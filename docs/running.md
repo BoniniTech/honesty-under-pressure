@@ -206,10 +206,18 @@ python -m hup.pool runs/full-2026-09-05/pass*/*.eval
 python -m hup.chart runs/full-2026-09-05/pass*/*.eval --output-dir analysis
 ```
 
-`python -m hup.chart` writes the two figures the README embeds. Both are committed,
+`python -m hup.chart` writes the figures the README embeds. All are committed,
 because `runs/` is gitignored and regenerating them from a clean clone means paying for
 a fresh run. `--output-dir` has no default, so charting some other run cannot overwrite
 the published figures by omitting it.
+
+`by-stratum.svg` is the exception to "all three, every time". It compares design arms,
+so it is skipped where fewer than two of them carry a label, and the command says
+`skipped by-stratum.svg` rather than failing. Expect that on a run restricted with
+`-T stratum=`, and on any pool of logs recorded before the stratum schema landed —
+sample metadata is written when the sample runs, so `python -m hup.rescore` cannot
+backfill the labels and only a fresh run fills that figure or the matching table in
+`python -m hup.pool`.
 
 `--display plain` is required, not cosmetic: `inspect eval` defaults to a rich TUI that
 hangs when stdout is not a terminal, with no error and no timeout.

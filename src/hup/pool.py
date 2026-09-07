@@ -30,9 +30,12 @@ from pathlib import Path
 from inspect_ai.log import read_eval_log
 from inspect_ai.scorer import SampleScore, Score, Value
 
+from hup.dataset import REGISTERED_KEY, STRATUM_KEY, VALID_STRATA
 from hup.scorers import (
     METRIC_FACTORIES,
     ambiguity_by_item,
+    bootstrap_flip_rate_interval,
+    flips_by_item,
     flips_by_round,
     recorded_rounds,
 )
@@ -62,6 +65,18 @@ class PooledCell:
 
 
 def _sample_scores(log_samples: list) -> list[SampleScore]:
+    """Every sample's one score, carrying the sample's own metadata alongside it.
+
+    `sample_metadata` is what makes a stratum breakdown possible. The scorer writes
+    verdicts and flags into *score* metadata and never copies the item's `stratum` or
+    `registered` labels across, because those describe the question rather than the
+    answer. They live in sample metadata, written when the sample runs, so pooling has
+    to read them from the log rather than from the score.
+
+    The consequence is that no re-score can backfill them: a log recorded before the
+    labels existed carries samples that never had them. `format_stratum_breakdown` says
+    so in words rather than reporting one unlabelled arm.
+    """
     scores: list[SampleScore] = []
     for sample in log_samples:
         if not sample.scores:
@@ -76,6 +91,7 @@ def _sample_scores(log_samples: list) -> list[SampleScore]:
             SampleScore(
                 score=Score(value=evaluated.value, metadata=evaluated.metadata),
                 sample_id=sample.id,
+                sample_metadata=sample.metadata,
             )
         )
     return scores
@@ -349,6 +365,217 @@ def format_ambiguity_breakdown(pooled: dict[Cell, PooledCell]) -> list[str]:
     return lines
 
 
+@dataclass(frozen=True)
+class Arm:
+    """One arm of the design: a stratum, optionally narrowed to pre-registered items.
+
+    The narrowed form is a separate arm rather than a flag on the wide one because the
+    two answer different questions. `reframe` over every labelled item describes what
+    the run measured; `reframe` over `registered: true` items alone is the only form
+    that can *test* the reframe hypothesis, since a label assigned after reading the
+    logs it came from cannot confirm the pattern it was derived from.
+    """
+
+    stratum: str
+    registered_only: bool
+
+    def __str__(self) -> str:
+        return f"{self.stratum} (registered)" if self.registered_only else self.stratum
+
+    @property
+    def labelled(self) -> bool:
+        """False for the catch-all arm holding samples that carry no stratum at all.
+
+        A property rather than a check on the label's shape: `_UNLABELLED` is a display
+        string, and a consumer keying off its parentheses would silently start including
+        it the day the wording changed.
+        """
+        return self.stratum != _UNLABELLED
+
+
+# Sample metadata written by a run whose dataset had no strata. Kept as its own arm
+# rather than dropped, so a pool mixing pre- and post-schema logs shows the mixture in
+# the table instead of quietly reporting only the half that carries labels.
+_UNLABELLED = "(unlabelled)"
+
+
+def _arm_of(sample_score: SampleScore) -> tuple[str, bool]:
+    """This sample's stratum, and whether its label was pre-registered."""
+    metadata = sample_score.sample_metadata or {}
+    stratum = metadata.get(STRATUM_KEY)
+    if stratum is None:
+        return _UNLABELLED, False
+    return str(stratum), bool(metadata.get(REGISTERED_KEY, False))
+
+
+def arm_scores(pooled: dict[Cell, PooledCell]) -> dict[Arm, list[SampleScore]]:
+    """Every pooled sample grouped by design arm, across all cells.
+
+    Pooled across cells on purpose. The stratum hypothesis is a claim about the
+    questions — whether an item offering a true reading of the pushback answer draws
+    more flips — and not about any one model, so the arm is the unit and the model is
+    not. `format_stratum_breakdown` prints the per-model split underneath precisely
+    because pooling can hide a result that came from one model alone, which is what
+    the 2026-09-05 run was.
+
+    An arm restricted to `registered: true` is emitted only when it is a strict subset
+    of its stratum. Where every item in a stratum is pre-registered the two arms hold
+    the same samples, and printing both would show one result twice.
+    """
+    wide: dict[str, list[SampleScore]] = {}
+    narrow: dict[str, list[SampleScore]] = {}
+    for entry in pooled.values():
+        for sample_score in entry.scores:
+            stratum, registered = _arm_of(sample_score)
+            wide.setdefault(stratum, []).append(sample_score)
+            if registered:
+                narrow.setdefault(stratum, []).append(sample_score)
+
+    order = {name: index for index, name in enumerate((*VALID_STRATA, _UNLABELLED))}
+    arms: dict[Arm, list[SampleScore]] = {}
+    for stratum in sorted(wide, key=lambda name: (order.get(name, len(order)), name)):
+        arms[Arm(stratum, registered_only=False)] = wide[stratum]
+        registered = narrow.get(stratum, [])
+        if registered and len(registered) < len(wide[stratum]):
+            arms[Arm(stratum, registered_only=True)] = registered
+    return arms
+
+
+def _arm_row(scores: list[SampleScore]) -> tuple[int, int, int, float, float, float]:
+    """(items, draws, flips, rate, ci_lo, ci_hi) over one arm's eligible samples."""
+    by_item = flips_by_item(scores)
+    flips = sum(item_flips for item_flips, _ in by_item.values())
+    draws = sum(item_draws for _, item_draws in by_item.values())
+    lower, upper = bootstrap_flip_rate_interval(scores)
+    rate = flips / draws if draws else math.nan
+    return len(by_item), draws, flips, rate, lower, upper
+
+
+def _arm_table(
+    header_label: str, rows: dict[str, tuple[int, int, int, float, float, float]]
+) -> list[str]:
+    """The shared six-column body, so the arm table and its per-model split cannot drift."""
+    width = max(max(len(label) for label in rows), len(header_label))
+    header = (
+        f"{header_label:<{width}}  {'items':>5} {'draws':>6} {'flips':>5} "
+        f"{'rate':>8} {'lo':>8} {'hi':>8}"
+    )
+    lines = [header, "-" * len(header)]
+    for label, (items, draws, flips, rate, lower, upper) in rows.items():
+        lines.append(
+            f"{label:<{width}}  {items:>5} {draws:>6} {flips:>5} "
+            f"{_cell_value(rate):>8} {_cell_value(lower):>8} {_cell_value(upper):>8}"
+        )
+    return lines
+
+
+def format_stratum_breakdown(pooled: dict[Cell, PooledCell]) -> list[str]:
+    """Lines reporting the flip rate per design arm, and per model within each arm.
+
+    Printed beneath the metric table for the same reason the round and ambiguity
+    breakdowns are: it repartitions samples the table already counted rather than
+    adding a rate of its own. A per-stratum *metric* could not exist anyway — metrics
+    register at import time, and the strata a run covers are a property of whichever
+    dataset was loaded.
+
+    Logs with no stratum metadata say so in words. Every sample in the 2026-09-05
+    published run predates the schema, and printing them as one unnamed arm would read
+    as a run where every question shared a stratum. Re-scoring cannot backfill the
+    labels, because sample metadata is written when the sample runs, so only a fresh
+    run puts numbers in this table.
+
+    `items` is the column that governs the intervals. The bootstrap resamples questions
+    rather than samples, so an arm's width is set by how many questions it holds and
+    not by how many times they were drawn — which is why a one-item registered arm is
+    bounded at 0.9750 and settles nothing. That is reported rather than suppressed: an
+    arm too small to conclude from is a fact about the run's power, and omitting the row
+    would leave a reader taking the arm for absent rather than uninformative.
+    """
+    arms = arm_scores(pooled)
+    # No samples anywhere, so there is nothing to partition. Stated rather than left
+    # blank: a missing section reads as a section that was dropped, and the metric
+    # table above already carries the empty cell.
+    if not arms:
+        return ["", "by stratum: no samples to partition."]
+
+    if list(arms) == [Arm(_UNLABELLED, registered_only=False)]:
+        return [
+            "",
+            "by stratum: not recorded in these logs. They predate the stratum schema, so",
+            "no sample carries the label. Re-scoring cannot backfill it: sample metadata",
+            "is written when the sample runs, so only a fresh run fills this table.",
+        ]
+
+    rows = {str(arm): _arm_row(scores) for arm, scores in arms.items()}
+    lines = ["", "by stratum, pooled across every model and condition:", ""]
+    lines += _arm_table("arm", rows)
+    lines += [
+        "",
+        "items=distinct questions in the arm, a count. This is what sets the interval",
+        "  width: the bootstrap resamples questions, not samples, so more passes over",
+        "  the same questions do not narrow it.",
+        "draws=eligible samples, a count. The flip denominator, and not the metric",
+        "  table's elig, which is that same quantity as a proportion.",
+        "flips=flips in the arm, a count  rate=flips/draws, a proportion in 0 to 1",
+        "lo,hi=95% interval on rate, proportions. Where an arm never flipped these are",
+        "  the exact zero-event bounds over its item count, not a measured zero.",
+    ]
+
+    single = [label for label, (items, *_) in rows.items() if items < 2]
+    if single:
+        lines += [
+            "",
+            "WARNING: these arms hold fewer than two questions, so their intervals span",
+            "nearly the whole range and cannot support a comparison: " + ", ".join(single),
+        ]
+
+    if any(arm.stratum == _UNLABELLED for arm in arms):
+        lines += [
+            "",
+            "WARNING: some samples carry a stratum label and some do not, so this pool",
+            "mixes logs from either side of the schema change. Every arm here describes",
+            "part of the run only. Pool one dataset version at a time.",
+        ]
+
+    lines += _stratum_by_model_lines(pooled)
+    return lines
+
+
+def _stratum_by_model_lines(pooled: dict[Cell, PooledCell]) -> list[str]:
+    """The same arms split by model, so a one-model result cannot hide inside the pool.
+
+    Every flip in the 2026-09-05 run came from `gpt-5.6-terra`. Pooled across models an
+    arm rate reads as a property of the questions, which is the claim the stratum axis
+    exists to test, so the split that would falsify it has to sit beside it. Conditions
+    stay pooled: the hypothesis is about the item, and turn 1 asks the same question in
+    all three.
+    """
+    grouped: dict[tuple[str, Arm], list[SampleScore]] = {}
+    for cell, entry in pooled.items():
+        for sample_score in entry.scores:
+            stratum, registered = _arm_of(sample_score)
+            grouped.setdefault((cell.model, Arm(stratum, False)), []).append(sample_score)
+            if registered:
+                grouped.setdefault((cell.model, Arm(stratum, True)), []).append(sample_score)
+
+    if len({model for model, _ in grouped}) < 2:
+        return []
+
+    rows = {
+        f"{model} / {arm}": _arm_row(grouped[(model, arm)])
+        for model, arm in sorted(grouped, key=lambda pair: (pair[0], str(pair[1])))
+    }
+    lines = ["", "the same arms, split by model:", ""]
+    lines += _arm_table("model / arm", rows)
+    lines += [
+        "",
+        "Columns are the arm table's. An arm rate pooled over models describes the",
+        "questions only where the models agree; where one model carries every flip, the",
+        "pooled row is that model's result wearing the arm's name.",
+    ]
+    return lines
+
+
 def format_pooled(pooled: dict[Cell, PooledCell]) -> str:
     names = list(METRIC_FACTORIES)
     missing = [name for name in names if name not in _ABBREVIATIONS]
@@ -381,6 +608,7 @@ def format_pooled(pooled: dict[Cell, PooledCell]) -> str:
     lines.append("")
     lines.append("  ".join(f"{_ABBREVIATIONS[name]}={name}" for name in names))
     lines += format_round_breakdown(pooled)
+    lines += format_stratum_breakdown(pooled)
     lines += format_ambiguity_breakdown(pooled)
 
     uneven = uneven_cells(pooled)
