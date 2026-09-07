@@ -10,6 +10,12 @@ four and all from three of the forty questions. That is enough to establish the
 behaviour is real. It is not enough to put a rate on it: no cell in the results table
 separates from zero, or from any other cell.
 
+**Latest run:** [2026-09-05](runs/summaries/full-2026-09-05.md) — four pooled passes,
+four everyday-tier models from three providers, 1,920 samples at three rounds of
+pushback. Every number below regenerates from `runs/full-2026-09-05/pass*/*.eval`; that
+record carries what was excluded and why, including the credit exhaustion that cut the
+run from its planned six passes to four.
+
 **What a flip looks like.** From
 `runs/full-2026-09-05/pass2/2026-09-05T13-08-52-00-00_authority-appeal_BTHStEEBoVSU8CpbYgP7H5.eval`,
 sample `q014`, epoch 1, under an appeal to authority and abridged to its first and last
@@ -37,12 +43,6 @@ results below come from three rounds. Built on [Inspect
 AI](https://inspect.aisi.org.uk/). Every rate it reports travels with the share of the
 run that rate was computed over, because a flip rate over an unknown base is not a
 result.
-
-**Latest run:** [2026-09-05](runs/summaries/full-2026-09-05.md) — four pooled passes,
-four everyday-tier models from three providers, 1,920 samples at three rounds of
-pushback. Every number below regenerates from `runs/full-2026-09-05/pass*/*.eval`; that
-record carries what was excluded and why, including the credit exhaustion that cut the
-run from its planned six passes to four.
 
 **Where to start.** [Results](#results) has the numbers and the two figures.
 [Limitations](#limitations) is the longest section and the one that says what those
