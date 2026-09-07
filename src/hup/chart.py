@@ -150,6 +150,78 @@ def axis_max_for(results: list[CellResult], *, minimum: float = _MIN_AXIS_MAX) -
     return max(minimum, math.ceil(largest / _AXIS_STEP) * _AXIS_STEP)
 
 
+def _separated(results: list[CellResult]) -> list[CellResult]:
+    """Rows whose interval clears every other row's, so a ranking claim is supportable."""
+    return [
+        result
+        for result in results
+        if not math.isnan(result.lower)
+        and all(
+            result.lower > other.upper
+            for other in results
+            if other is not result and not math.isnan(other.upper)
+        )
+    ]
+
+
+def flip_rate_footer(results: list[CellResult]) -> list[str]:
+    """The two footer lines, computed from `results` rather than written by hand.
+
+    These lines make factual claims about the figure directly above them — which cells
+    overlap, what a zero cell is bounded at, whether the run supports a ranking. They
+    were hardcoded to the 2026-08-19 run, so any later run rendered a caption quoting
+    another run's numbers under its own dots. The figure is a committed artifact whose
+    whole point is that a moved number shows up in a diff, and a frozen caption is the
+    one part of it that could not move.
+
+    Reads `zero_event` rather than recomputing it, so the sentence about zero cells and
+    the grey ink on those rows can never disagree.
+    """
+    if not results:
+        return []
+
+    zero = [result for result in results if result.zero_event]
+    flipped = [result for result in results if not result.zero_event]
+    separated = _separated(results)
+
+    if separated:
+        headline = (
+            "These cells clear every other interval: "
+            + ", ".join(
+                f"{_model_label(r.cell.model)} / {_short_condition(r.cell.condition)}"
+                for r in separated
+            )
+            + "."
+        )
+    elif len(results) > 1:
+        headline = (
+            "Every interval overlaps every other, so this run cannot rank the models "
+            "or the conditions."
+        )
+    else:
+        headline = "One cell, so there is nothing here to rank it against."
+
+    if zero and flipped:
+        widest_zero = max(r.upper for r in zero)
+        tightest_flip = min(r.upper for r in flipped)
+        detail = (
+            f"A cell that never flipped is bounded at {widest_zero:.4f}, not measured at "
+            f"zero, against {tightest_flip:.4f} on a cell that did."
+        )
+    elif zero:
+        detail = (
+            f"No cell flipped. Each is bounded at {max(r.upper for r in zero):.4f} rather "
+            f"than measured at zero, which is what {len(zero)} such cells can rule out."
+        )
+    else:
+        detail = (
+            "Every cell flipped at least once, so every interval here is a percentile "
+            "bootstrap over the items rather than a zero-event bound."
+        )
+
+    return [headline, detail]
+
+
 def flip_rate_figure(results: list[CellResult], *, axis_max: float | None = None) -> str:
     """Pre-registered figure: flip rate by model and condition, with 95% intervals.
 
@@ -251,28 +323,8 @@ def flip_rate_figure(results: list[CellResult], *, axis_max: float | None = None
         )
 
     footer = top + row_height * len(results) + 30
-    parts.append(
-        _text(
-            24,
-            footer,
-            "Every interval overlaps every other. A cell that never flipped is bounded at "
-            "0.0881, not measured at zero,",
-            size=10.5,
-            fill=_MUTED,
-            anchor="start",
-        )
-    )
-    parts.append(
-        _text(
-            24,
-            footer + 14,
-            "which is wider than the 0.0690 on the one cell that did. This run cannot rank "
-            "the models or the conditions.",
-            size=10.5,
-            fill=_MUTED,
-            anchor="start",
-        )
-    )
+    for index, line in enumerate(flip_rate_footer(results)):
+        parts.append(_text(24, footer + 14 * index, line, size=10.5, fill=_MUTED, anchor="start"))
     parts.append("</svg>")
     return "\n".join(parts) + "\n"
 
@@ -639,14 +691,22 @@ def main(argv: list[str] | None = None) -> int:
     flip_rate_path.write_text(flip_rate_figure(results), encoding="utf-8")
     print(f"wrote {flip_rate_path}")
 
-    target = flipping_cell(results)
-    label = f"{_model_label(target.cell.model)} / {_short_condition(target.cell.condition)}"
-    per_item_path = args.output_dir / "per-item.svg"
-    per_item_path.write_text(
-        per_item_figure(flips_by_item(pooled[target.cell].scores), label=label),
-        encoding="utf-8",
-    )
-    print(f"wrote {per_item_path}")
+    # Skipped rather than fatal. A run where nothing flipped is a real and likely
+    # result — three of the four models on 2026-09-05 flipped zero times — and it used
+    # to raise here, after flip-rate.svg was already on disk and before anything else
+    # was written. That leaves a release with one figure of the three it attaches.
+    try:
+        target = flipping_cell(results)
+    except ValueError as reason:
+        print(f"skipped per-item.svg: {reason}")
+    else:
+        label = f"{_model_label(target.cell.model)} / {_short_condition(target.cell.condition)}"
+        per_item_path = args.output_dir / "per-item.svg"
+        per_item_path.write_text(
+            per_item_figure(flips_by_item(pooled[target.cell].scores), label=label),
+            encoding="utf-8",
+        )
+        print(f"wrote {per_item_path}")
 
     # Skipped rather than refused. A run restricted to one arm with `-T stratum=` is a
     # legitimate run, and so is a pool of logs written before the schema; neither has a

@@ -28,6 +28,7 @@ from hup.chart import (
     by_stratum_figure,
     cell_results,
     flip_rate_figure,
+    flip_rate_footer,
     flipping_cell,
     main,
     per_item_figure,
@@ -156,8 +157,14 @@ class TestFlipRateFigure:
         assert flip_rate_figure(results) == flip_rate_figure(results)
 
     def test_the_figure_says_the_zero_cells_are_bounded_not_measured(self) -> None:
-        results = cell_results(_cell("anthropic/x", "authority_appeal", _full_run_shaped()))
-        assert "bounded at 0.0881, not measured at zero" in flip_rate_figure(results)
+        """Needs a fixture that actually holds a zero cell. This test used to assert the
+        sentence against `_full_run_shaped()`, which is one cell that flipped six times,
+        so it pinned a claim the figure had no basis for."""
+        pooled = _cell("anthropic/x", "authority_appeal", _full_run_shaped())
+        pooled.update(_cell("anthropic/x", "confidence_social", _clean_cell_scores()))
+        svg = flip_rate_figure(cell_results(pooled))
+        assert "never flipped is bounded at 0.0881, not measured at zero" in svg
+        assert "against 0.0687 on a cell that did" in svg
 
     def test_a_model_is_named_once_across_its_conditions(self) -> None:
         """Three rows per model, one label. A repeated name reads as three models."""
@@ -427,3 +434,90 @@ class TestByStratumInMain:
         )
         assert main([str(tmp_path / "fake.eval"), "--output-dir", str(tmp_path / "out")]) == 0
         assert "1 labelled arm(s)" in capsys.readouterr().out
+
+
+def _clean_cell_scores() -> list[SampleScore]:
+    """40 questions, six draws each, nothing ever flipping."""
+    scores: list[SampleScore] = []
+    for index in range(40):
+        scores += [_score("correct", "correct", f"c{index:03d}")] * 6
+    return scores
+
+
+class TestFlipRateFooter:
+    """The footer states facts about the figure above it: which intervals overlap, what
+    a zero cell rules out, whether a ranking is supportable. It was hardcoded to the
+    2026-08-19 run, so every later render quoted another run's numbers under its own
+    dots, in a committed file whose point is that a moved number shows in the diff."""
+
+    def test_it_reports_this_run_s_own_bound(self) -> None:
+        pooled = _cell("anthropic/x", "authority_appeal", _full_run_shaped())
+        pooled.update(_cell("anthropic/x", "confidence_social", _clean_cell_scores()))
+        headline, detail = flip_rate_footer(cell_results(pooled))
+        assert "cannot rank the models" in headline
+        assert "0.0881" in detail and "0.0687" in detail
+
+    def test_an_all_zero_run_says_nothing_flipped(self) -> None:
+        """Three of the four models on 2026-09-05 flipped zero times. The old footer
+        told that reader a cell 'did' flip and quoted its bound."""
+        pooled = _cell("anthropic/x", "authority_appeal", _clean_cell_scores())
+        pooled.update(_cell("anthropic/x", "confidence_social", _clean_cell_scores()))
+        _, detail = flip_rate_footer(cell_results(pooled))
+        assert detail.startswith("No cell flipped.")
+        assert "0.0881" in detail
+
+    def test_an_all_flipping_run_claims_no_zero_event_bound(self) -> None:
+        pooled = _cell("anthropic/x", "authority_appeal", _full_run_shaped())
+        _, detail = flip_rate_footer(cell_results(pooled))
+        assert "Every cell flipped at least once" in detail
+
+    def test_a_separated_cell_is_named_rather_than_denied(self) -> None:
+        """The overlap sentence is a claim, not a house style. A run that does separate
+        its cells has to say so."""
+        results = [
+            CellResult(Cell("m", "a"), 10, 9, 0.9, 0.8, 1.0, False),
+            CellResult(Cell("m", "b"), 10, 0, 0.0, 0.0, 0.1, True),
+        ]
+        headline, _ = flip_rate_footer(results)
+        assert "clear every other interval" in headline
+        assert "m / a" in headline
+
+    def test_the_zero_sentence_agrees_with_the_grey_ink(self) -> None:
+        """`zero_event` drives both the row colour and the sentence, so the caption and
+        the figure cannot contradict each other."""
+        results = [CellResult(Cell("m", "a"), 10, 0, 0.0, 0.0, 0.0881, True)]
+        _, detail = flip_rate_footer(results)
+        assert "No cell flipped." in detail
+
+    def test_no_results_render_no_footer(self) -> None:
+        assert flip_rate_footer([]) == []
+
+
+class TestChartSurvivesARunWithNoFlips:
+    def test_it_skips_per_item_and_still_writes_the_others(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """It used to raise here, after flip-rate.svg was on disk and before anything
+        else was written, leaving a release with one figure of the three it attaches."""
+        scores = [
+            SampleScore(
+                score=_score("correct", "correct", f"c{index:03d}").score,
+                sample_id=f"c{index:03d}",
+                sample_metadata={
+                    "stratum": "baseline" if index % 2 else "reframe",
+                    "registered": False,
+                },
+            )
+            for index in range(40)
+        ]
+        monkeypatch.setattr(
+            "hup.chart.load_cells", lambda _paths: _cell("openai/x", "plain_contradiction", scores)
+        )
+
+        assert main([str(tmp_path / "fake.eval"), "--output-dir", str(tmp_path / "out")]) == 0
+
+        out = tmp_path / "out"
+        assert (out / "flip-rate.svg").exists()
+        assert (out / "by-stratum.svg").exists()
+        assert not (out / "per-item.svg").exists()
+        assert "skipped per-item.svg" in capsys.readouterr().out
