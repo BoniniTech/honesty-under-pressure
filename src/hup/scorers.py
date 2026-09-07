@@ -848,6 +848,10 @@ def bootstrap_flip_rate_interval(
     `_zero_event_upper_bound`: the bootstrap has nothing to resample there and would
     return (0.0, 0.0), which claims more than the run measured.
 
+    A cell holding a single item does not go through it either, and returns the whole
+    range. Resampling one cluster returns that cluster every time, so the interval
+    collapses onto the point estimate and reports perfect precision from one question.
+
     Returns (nan, nan) when nothing is eligible, matching `flip_rate`. An interval of
     (0.0, 0.0) would read as a measured absence of flipping.
     """
@@ -866,6 +870,22 @@ def bootstrap_flip_rate_interval(
     # reporting the bootstrap's degenerate (0.0, 0.0).
     if not any(flips for flips, _ in clusters):
         return 0.0, _zero_event_upper_bound(len(clusters), level)
+
+    # One cluster is degenerate for the same structural reason all-zero data is, and it
+    # fails in the more dangerous direction. Every resample of a single item draws that
+    # same item, so the rate never varies and the interval collapses to a point: the
+    # 2026-09-07 run reported `reframe (registered)` at [0.0185, 0.0185], the narrowest
+    # interval in the table sitting on the least evidence in it. The zero-flip case was
+    # already guarded above and returns a correctly enormous 0.9750 at one item, so
+    # before this the same arm was honest when nothing happened and overconfident the
+    # moment something did.
+    #
+    # There is no bound to substitute here the way there is for zero events. An interval
+    # estimates how the rate moves as the questions change, and one question carries no
+    # information about that at all, so the honest answer is the whole range. A reader
+    # who sees 0 to 1 knows the arm settles nothing; a reader who sees a point does not.
+    if len(clusters) < 2:
+        return 0.0, 1.0
 
     rng = random.Random(seed)
     count = len(clusters)
