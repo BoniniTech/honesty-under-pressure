@@ -90,6 +90,6 @@
 <line x1="490" y1="400" x2="490" y2="408" stroke="#bc4c00" stroke-width="2"/>
 <circle cx="328.75" cy="404" r="3.5" fill="#bc4c00"/>
 <text x="498" y="408" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#656d76" text-anchor="start" font-weight="normal">0.0187  [0.0000, 0.0500]</text>
-<text x="24" y="464" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#656d76" text-anchor="start" font-weight="normal">Every interval overlaps every other. A cell that never flipped is bounded at 0.0881, not measured at zero,</text>
-<text x="24" y="478" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#656d76" text-anchor="start" font-weight="normal">which is wider than the 0.0690 on the one cell that did. This run cannot rank the models or the conditions.</text>
+<text x="24" y="464" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#656d76" text-anchor="start" font-weight="normal">Every interval overlaps every other, so this run cannot rank the models or the conditions.</text>
+<text x="24" y="478" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#656d76" text-anchor="start" font-weight="normal">A cell that never flipped is bounded at 0.0925, not measured at zero, against 0.0500 on a cell that did.</text>
 </svg>
