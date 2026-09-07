@@ -526,6 +526,16 @@ follow the same order:
    ellipsis for text dropped inside one. Nothing checks this in CI, because `runs/` is
    gitignored and the job would have nothing to compare against.
 
+   It covers the README, `docs/`, and **one** run summary: whichever
+   `runs/summaries/full-<date>.md` the Latest-run pointer names. A summary is never
+   edited in place, so its transcripts can only be wrong when it is written; after that
+   the file is frozen and there is nothing left to catch. Its logs are not frozen, so
+   checking every summary forever would make each release depend on every past run's
+   logs still being on the machine. Checking the published one costs nothing extra,
+   because regenerating the figures already needs those same logs. **Write the summary,
+   then run the checker before opening the PR** — that is the one moment its transcripts
+   are checkable.
+
 Summaries carry three more, because the README publishes one set of numbers and is
 rewritten per run while a summary accumulates:
 

@@ -40,6 +40,17 @@ missing degree sign, a curly quote flattened to a straight one.
 **What it does not cover.** Only labelled transcript blockquotes. A phrase from a reply
 quoted inline in a sentence carries a citation and is not checked here; the `q038`
 retirement note in the README is the live example.
+
+**Which run summaries are covered.** One: whichever `runs/summaries/full-<date>.md` the
+README's Latest-run pointer names. The rest are excluded, and the asymmetry is the point.
+A summary is never edited in place, so its transcripts can only be wrong at the moment it
+is written -- after that the file is frozen and a permanent check has nothing left to
+catch. The logs are not permanent, though: `runs/` is gitignored, so on any machine that
+did not run a given sweep every transcript in that run's summary reports UNCHECKED, and
+the release procedure treats UNCHECKED as a failure. Covering every summary would
+therefore trade a one-time benefit for a recurring release cost that grows with each run.
+Covering the published one adds no requirement the release does not already have, because
+`python -m hup.chart` needs those same logs to regenerate the figures.
 """
 
 from __future__ import annotations
@@ -55,9 +66,15 @@ from inspect_ai.log import read_eval_log_sample
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# The historical record. Summaries are never edited in place (CLAUDE.md, "Writing up a
-# run"), so a transcript quoted in one records what that run said at the time.
+# The historical record, excluded with one exception handled in `live_docs`: the summary
+# the README currently publishes. Summaries are never edited in place (CLAUDE.md, "Writing
+# up a run"), so a transcript quoted in one records what that run said at the time.
 _EXCLUDED_DIRS = ("runs/summaries",)
+
+# The README's pointer at the run it publishes. `tests/test_docs.py` enforces the rules
+# about where it may point; this module only needs to know which file it names, and both
+# read it from here so the pattern has one owner.
+_LATEST_RUN = re.compile(r"\*\*Latest run:\*\*\s*\[[^\]]*\]\((?P<target>[^)]+)\)")
 
 _ROLE_LABELS = {"**User:**": "user", "**Model:**": "assistant"}
 _ROLE_NAMES = {"user": "User", "assistant": "Model"}
@@ -110,14 +127,43 @@ class Result:
     unchecked: str | None = None
 
 
-def live_docs(root: Path | None = None) -> list[Path]:
-    """Every tracked Markdown file a reader is meant to read as current."""
+def latest_run_summary(root: Path | None = None) -> Path | None:
+    """The run summary the README's Latest-run pointer names, if it names one.
+
+    Returns None rather than raising when the README carries no pointer or names a file
+    that is not there. Both are real defects and `tests/test_docs.py` fails on them by
+    name; raising here would report them as a transcript error, several frames from the
+    thing that is actually wrong.
+    """
     root = root or REPO_ROOT
+    readme = root / "README.md"
+    if not readme.is_file():
+        return None
+    match = _LATEST_RUN.search(readme.read_text(encoding="utf-8"))
+    if not match:
+        return None
+    target = (root / match.group("target")).resolve()
+    return target if target.is_file() else None
+
+
+def live_docs(root: Path | None = None) -> list[Path]:
+    """Every tracked Markdown file a reader is meant to read as current.
+
+    The published run summary counts as current even though `runs/summaries` is
+    otherwise excluded -- it is the file the release ships as `report.md`, so its
+    transcripts are the ones a reader actually receives. See the module docstring for why
+    the other summaries stay out.
+    """
+    root = root or REPO_ROOT
+    published = latest_run_summary(root)
     docs = [
         path
         for path in sorted(root.rglob("*.md"))
         if ".venv" not in path.parts
-        and not any(excluded in path.relative_to(root).as_posix() for excluded in _EXCLUDED_DIRS)
+        and (
+            (published is not None and path.resolve() == published)
+            or not any(excluded in path.relative_to(root).as_posix() for excluded in _EXCLUDED_DIRS)
+        )
     ]
     if not docs:
         raise TranscriptError(f"found no live Markdown under {root} -- the glob is wrong")

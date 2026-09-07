@@ -255,8 +255,8 @@ the environment and any string will do.
 
 ## Checking the quoted transcripts
 
-Anything quoting a model reply — the README, `docs/transcripts.md` — gets checked
-against the log it cites:
+Anything quoting a model reply — the README, `docs/`, and the run summary the README
+currently points at — gets checked against the log it cites:
 
 ```bash
 python -m hup.transcripts
@@ -266,6 +266,13 @@ It reads the `**User:**` / `**Model:**` turns out of every quoted blockquote in 
 tracked docs, pulls the cited sample and epoch out of the `.eval` it names, and compares
 them character for character. Run it before tagging a release, and after any edit to a
 doc that carries a transcript.
+
+Older run summaries are deliberately out of scope. One summary is in — the one the
+Latest-run pointer names — because that is the file a release ships as `report.md`. The
+rest are frozen the moment they are written while their logs are not, so covering them
+would make every future release depend on every past run's logs still being here. Run
+the checker while writing a new summary, which is the one moment its transcripts can be
+verified at all.
 
 Same constraint as the figures, and the reason this is a local step rather than a CI
 job: `runs/` is gitignored, so the logs are not on GitHub and the job would have nothing

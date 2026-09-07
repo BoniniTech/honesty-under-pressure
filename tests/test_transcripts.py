@@ -21,6 +21,7 @@ from inspect_ai import eval as inspect_eval
 from inspect_ai.model import ChatMessage, ModelOutput
 
 from hup.transcripts import (
+    _LATEST_RUN,
     Quote,
     TranscriptError,
     Turn,
@@ -29,6 +30,7 @@ from hup.transcripts import (
     _parse_turns,
     _reproduces,
     check_docs,
+    latest_run_summary,
     live_docs,
     log_turns,
     main,
@@ -387,7 +389,7 @@ class TestTheRealDocs:
     # docs move welded a citation onto the first quoted line as
     # `Source: > **User:** How many...`, which no line-anchored pattern sees as a quote
     # at all, so it would have been skipped rather than failed.
-    _EXPECTED = 4
+    _EXPECTED = 6
 
     def test_every_live_transcript_parses_and_carries_a_citation(self) -> None:
         quotes = [quote for doc in live_docs() for quote in parse_quotes(doc)]
@@ -400,9 +402,17 @@ class TestTheRealDocs:
             assert quote.turns, f"{quote.where} parsed as a transcript with no turns"
             assert quote.log.endswith(".eval"), f"{quote.where} cites {quote.log!r}"
 
-    def test_live_docs_leaves_the_summaries_alone(self) -> None:
-        """Summaries are never edited in place, so a transcript in one is a record."""
-        assert not [doc for doc in live_docs() if "runs/summaries" in doc.as_posix()]
+    def test_live_docs_covers_the_published_summary_and_no_other(self) -> None:
+        """Exactly one summary is current: the one the README's pointer names.
+
+        The others are excluded because a summary is frozen once written while its logs
+        are not, so checking them forever would make every release depend on every past
+        run's logs still being present.
+        """
+        summaries = [doc for doc in live_docs() if "runs/summaries" in doc.as_posix()]
+        published = latest_run_summary()
+        assert published is not None, "README has no Latest-run pointer to a real file"
+        assert [doc.resolve() for doc in summaries] == [published]
 
 
 class TestCli:
@@ -429,3 +439,55 @@ class TestCli:
         with pytest.raises(SystemExit) as exit_info:
             runpy.run_module("hup.transcripts", run_name="__main__")
         assert exit_info.value.code == 0
+
+
+class TestThePublishedSummaryIsCovered:
+    """One run summary is checked: the one the README's Latest-run pointer names.
+
+    The asymmetry is deliberate. A summary is never edited in place, so its transcripts
+    can only be wrong when it is written; after that the file is frozen. Its logs are not
+    frozen -- `runs/` is gitignored -- so covering every summary would make every future
+    release depend on every past run's logs still being on the machine.
+    """
+
+    @staticmethod
+    def _repo(root: Path, pointer: str) -> None:
+        (root / "runs" / "summaries").mkdir(parents=True)
+        (root / "README.md").write_text(
+            f"**Latest run:** [2026-09-07]({pointer})\n", encoding="utf-8"
+        )
+        for name in ("full-2026-09-07.md", "full-2026-08-19.md", "pilot-2026-08-12.md"):
+            (root / "runs" / "summaries" / name).write_text(f"# {name}\n", encoding="utf-8")
+
+    def test_the_pointed_at_summary_is_included(self, tmp_path: Path) -> None:
+        self._repo(tmp_path, "runs/summaries/full-2026-09-07.md")
+        names = {path.name for path in live_docs(tmp_path)}
+        assert "full-2026-09-07.md" in names
+
+    def test_every_other_summary_stays_excluded(self, tmp_path: Path) -> None:
+        """Including them would report UNCHECKED on any machine that did not run those
+        sweeps, and the release procedure treats UNCHECKED as a failure."""
+        self._repo(tmp_path, "runs/summaries/full-2026-09-07.md")
+        names = {path.name for path in live_docs(tmp_path)}
+        assert "full-2026-08-19.md" not in names
+        assert "pilot-2026-08-12.md" not in names
+
+    def test_a_missing_pointer_excludes_every_summary(self, tmp_path: Path) -> None:
+        """A README with no pointer is a defect `tests/test_docs.py` fails on by name.
+        This module degrades to the old behaviour rather than raising several frames from
+        the thing that is wrong."""
+        (tmp_path / "runs" / "summaries").mkdir(parents=True)
+        (tmp_path / "README.md").write_text("no pointer here\n", encoding="utf-8")
+        (tmp_path / "runs" / "summaries" / "full-2026-09-07.md").write_text("x\n", encoding="utf-8")
+        assert latest_run_summary(tmp_path) is None
+        assert {path.name for path in live_docs(tmp_path)} == {"README.md"}
+
+    def test_a_pointer_at_a_missing_file_is_not_followed(self, tmp_path: Path) -> None:
+        self._repo(tmp_path, "runs/summaries/full-2099-01-01.md")
+        assert latest_run_summary(tmp_path) is None
+        assert "full-2026-09-07.md" not in {path.name for path in live_docs(tmp_path)}
+
+    def test_the_pattern_has_one_owner(self) -> None:
+        """`tests/test_docs.py` imports this pattern rather than carrying its own copy.
+        Two regexes for one fact drift, and the failure is silent in both directions."""
+        assert _LATEST_RUN.search("**Latest run:** [2026-09-07](runs/summaries/full-2026-09-07.md)")
