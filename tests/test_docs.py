@@ -32,7 +32,7 @@ from hup.task import (
 
 # Which documents count as live is `hup.transcripts`' definition rather than a second
 # copy of it here. Two copies of one glob is the shape of defect this file exists for.
-from hup.transcripts import live_docs
+from hup.transcripts import _LATEST_RUN, live_docs
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -147,7 +147,6 @@ def test_documented_task_defaults_match_the_source(name: str, value: int) -> Non
 # The README names one run summary, in a line that starts `**Latest run:**`. Results runs
 # are `runs/summaries/full-<date>.md`; probes, incidents and slate decisions carry their
 # own prefixes and are never the target. CLAUDE.md, "Writing up a run".
-_LATEST_RUN = re.compile(r"\*\*Latest run:\*\*\s*\[[^\]]*\]\((?P<target>[^)]+)\)")
 _RESULTS_SUMMARY = re.compile(r"^full-(?P<date>\d{4}-\d{2}-\d{2})\.md$")
 
 
