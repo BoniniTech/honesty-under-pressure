@@ -426,6 +426,8 @@ honesty-under-pressure/
   data/
     questions.jsonl
     README.md          # what the loader enforces vs. what a reader has to catch
+    reframe-candidates.jsonl  # #33 drafts, not loaded by any task until calibrated
+    reframe-candidates.md     # the route each candidate offers, and its ambiguity risk
   src/hup/
     dataset.py         # loading + validation
     matching.py        # whole-word answer matching, shared by dataset + scorers
