@@ -589,11 +589,10 @@ run's summary, which carries that run's corrections and history.
 
 The README references **exactly one** run summary: the **Latest run** link near the top,
 pointing at the newest summary that carries *results* —
-`runs/summaries/full-2026-09-05.md`, not whichever `runs/summaries/<run>.md` was written
+`runs/summaries/full-2026-09-07.md`, not whichever `runs/summaries/<run>.md` was written
 most recently. Summaries recording an incident, a probe or a slate decision are not
-results and do not move the pointer; `model-alias-drift`, `retry-hang` and
-`verdict-instability` are all newer than the current target and none of them should own
-that link. Update it in the same PR that adds a results summary — a stale pointer sends
+results and do not move the pointer, however recently they were written. Update it in
+the same PR that adds a results summary — a stale pointer sends
 a reader to superseded numbers sitting under a heading that calls them current, and a
 mis-aimed one sends them somewhere with no numbers at all. **Carry no synopsis of any
 earlier run.** A superseded run's table, pass count, model slate or config belongs in
