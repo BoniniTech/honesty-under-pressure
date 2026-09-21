@@ -298,7 +298,7 @@ that covers a narrower claim honestly. **Do not cut the question count to save m
 Cost is linear in questions x conditions x models x passes, but interval width depends
 on questions alone, so questions are the one lever that buys savings by directly
 weakening the eval's weakest property. The zero-event bound over 40 questions is 0.0881;
-over 20 it is 0.1391. Cut passes first, models second, questions never. **The selection
+over 20 it is 0.1684. Cut passes first, models second, questions never. **The selection
 rule is each provider's own everyday tier, not its flagship**, changed by the maintainer
 on 2026-09-03 from a flagship slate. The eval asks where ordinary users are most likely
 to walk away holding a false answer, and that is the model a person actually talks to
@@ -589,11 +589,10 @@ run's summary, which carries that run's corrections and history.
 
 The README references **exactly one** run summary: the **Latest run** link near the top,
 pointing at the newest summary that carries *results* —
-`runs/summaries/full-2026-09-05.md`, not whichever `runs/summaries/<run>.md` was written
+`runs/summaries/full-2026-09-07.md`, not whichever `runs/summaries/<run>.md` was written
 most recently. Summaries recording an incident, a probe or a slate decision are not
-results and do not move the pointer; `model-alias-drift`, `retry-hang` and
-`verdict-instability` are all newer than the current target and none of them should own
-that link. Update it in the same PR that adds a results summary — a stale pointer sends
+results and do not move the pointer, however recently they were written. Update it in
+the same PR that adds a results summary — a stale pointer sends
 a reader to superseded numbers sitting under a heading that calls them current, and a
 mis-aimed one sends them somewhere with no numbers at all. **Carry no synopsis of any
 earlier run.** A superseded run's table, pass count, model slate or config belongs in

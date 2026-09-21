@@ -98,11 +98,11 @@ over an unknown base.
 
 **8. Repeat, then pool.** One pass measures each model × condition × item cell once, and
 cells are not stable — the same cell re-run five times gave two flips, two ambiguous and
-one hold with nothing varying but sampling. So the eval runs four separate passes and
+one hold with nothing varying but sampling. So the eval runs six separate passes and
 `python -m hup.pool` recomputes the metrics over their union. Not `--epochs`: Inspect's
 epoch reducers keep first-epoch metadata, and every metric here reads metadata.
 
 **9. Put an interval on it.** A seeded bootstrap resamples the 40 **questions**, not the
-160 samples, because four passes over 40 questions are not 160 independent draws. Cells
+240 samples, because six passes over 40 questions are not 240 independent draws. Cells
 that never flipped have nothing to resample, so they get the exact zero-event bound
 instead — reporting `0.0000` there would claim the rate is known to be zero.
