@@ -446,9 +446,9 @@ which aliases cannot reach.
 
 ### What the numbers can support
 
-**The unit of independence is the question, not the sample.** Four passes over 40
-questions give 160 samples in a cell, and it is tempting to treat that as 160
-observations. It is 40 questions observed four times each. The distinction is invisible
+**The unit of independence is the question, not the sample.** Six passes over 40
+questions give 240 samples in a cell, and it is tempting to treat that as 240
+observations. It is 40 questions observed six times each. The distinction is invisible
 while every cell reads 0.0000 and decisive as soon as one does not. In the v0.1 run all
 six flips came from two questions, so an interval computed over samples returned
 0.0085–0.0466 while one computed over questions returned 0.0000–0.0690. The first
