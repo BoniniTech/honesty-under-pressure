@@ -65,9 +65,9 @@ publishes one, use it: `anthropic/claude-haiku-4-5-20251001`,
 4.6, so `claude-sonnet-5` is the complete id — read the resolved id back out of the
 response and record it with the run date. `openai/gpt-4o-mini` shows why the string
 alone cannot decide this: it is an alias that happens to resolve to the dated id, which
-is luck rather than a guarantee. The published run used `anthropic/claude-sonnet-5`,
-`openai/gpt-5.6-terra`, `google/gemini-3.8-flash` and
-`anthropic/claude-haiku-4-5-20251001`, and all four resolved to themselves. Drop
+is luck rather than a guarantee. The published run used `openai/gpt-5.6-terra`,
+`google/gemini-3.8-flash` and `anthropic/claude-haiku-4-5-20251001`, and all three
+resolved to themselves. Drop
 `--limit 1` once you're past smoke-testing and ready to run the full 40-item set.
 
 On Windows, pass the task as a path relative to the repo root as shown. An absolute path
@@ -95,7 +95,7 @@ gave two flips, two ambiguous and one hold. See
 once, so results come from several passes pooled together:
 
 ```bash
-python -m hup.pool runs/full-2026-09-05/pass*/*.eval
+python -m hup.pool runs/full-2026-09-07/pass*/*.eval
 ```
 
 Under the metric table it prints where each cell's flips happened — the round the model
@@ -109,11 +109,11 @@ one-round pass and a three-round pass produce the same cells, the same sample co
 the same columns, so nothing in the table would show that the flip rate describes
 neither.
 
-Glob the pass directories, not `runs/full-2026-09-05/*.eval`. A run directory also holds
-the logs of whatever went wrong — here `credit-exhausted/` for the two passes the
-Anthropic balance cut short, and `failed-timeout/` for one condition that died on
-`RetryError(TimeoutError)` and was re-run. Those are kept on purpose and must stay out
-of any pooled number. The narrower glob excludes them by construction; the wider one
+Glob the pass directories, not `runs/full-2026-09-07/*.eval`. A run directory can also
+hold the logs of whatever went wrong. `runs/full-2026-09-05/` keeps `credit-exhausted/`
+for the two passes the Anthropic balance cut short, and `failed-timeout/` for one
+condition that died on `RetryError(TimeoutError)` and was re-run. Those are kept on
+purpose and must stay out of any pooled number. The narrower glob excludes them by construction; the wider one
 silently includes them.
 
 Google needs throttling. At the default 10 concurrent connections `gemini` returns
@@ -130,7 +130,7 @@ would report pass-1 numbers at N times the spend.
 Estimate the spend first. The estimator makes no provider calls and needs no key:
 
 ```bash
-python -m hup.budget --models anthropic/claude-sonnet-5 openai/gpt-5.6-terra google/gemini-3.8-flash anthropic/claude-haiku-4-5-20251001 --passes 4 --rounds 3
+python -m hup.budget --models openai/gpt-5.6-terra google/gemini-3.8-flash anthropic/claude-haiku-4-5-20251001 --passes 6 --rounds 3
 ```
 
 It derives the question count from `data/questions.jsonl` and the condition count from
@@ -140,7 +140,7 @@ differ by more than 5x per sample, so a blended average describes none of them.
 
 `--rounds` has to match the `-T rounds=` the run will use, since rounds multiply the
 bill and trade directly against passes. Means are recorded per depth, so a projection at
-a measured depth is a measurement: the estimate for the published four-pass run was
+a measured depth is a measurement: the estimate for the 2026-09-05 four-pass run was
 7,358,880 tokens against 7,374,223 actually billed, 0.2% low. At a depth nothing was
 measured at, the estimate scales the nearest measured mean by the turn-count ratio,
 marks the row `SCALED`, and says which way it is wrong — scaling up understates, so the
@@ -186,24 +186,24 @@ Together they give a sweep a real upper bound —
 has no size.
 
 `--cost-limit` is deliberately not used here. Inspect records cost only when a model
-carries price data, and none of the four models on this slate ship any, so the check
+carries price data, and none of the three models on this slate ship any, so the check
 never runs and the flag would look like protection that is not there.
 
 ## Reproducing the published results
 
-Four passes at three rounds, on `inspect-ai==0.3.255` as pinned in `pyproject.toml`.
-Each pass is four `inspect eval` invocations, one per model, and each writes three logs,
+Six passes at three rounds, on `inspect-ai==0.3.255` as pinned in `pyproject.toml`.
+Each pass is three `inspect eval` invocations, one per model, and each writes three logs,
 one per pressure condition:
 
 ```bash
-for pass in 1 2 3 4; do
-  for model in anthropic/claude-sonnet-5 openai/gpt-5.6-terra google/gemini-3.8-flash anthropic/claude-haiku-4-5-20251001; do
-    inspect eval src/hup/task.py --model $model -T rounds=3 --max-connections 5 --display plain --log-dir runs/full-2026-09-05/pass$pass
+for pass in 1 2 3 4 5 6; do
+  for model in openai/gpt-5.6-terra google/gemini-3.8-flash anthropic/claude-haiku-4-5-20251001; do
+    inspect eval src/hup/task.py --model $model -T rounds=3 --max-connections 5 --display plain --log-dir runs/full-2026-09-07/pass$pass
   done
 done
 
-python -m hup.pool runs/full-2026-09-05/pass*/*.eval
-python -m hup.chart runs/full-2026-09-05/pass*/*.eval --output-dir analysis
+python -m hup.pool runs/full-2026-09-07/pass*/*.eval
+python -m hup.chart runs/full-2026-09-07/pass*/*.eval --output-dir analysis
 ```
 
 `python -m hup.chart` writes the figures the README embeds. All are committed,
@@ -222,10 +222,10 @@ backfill the labels and only a fresh run fills that figure or the matching table
 `--display plain` is required, not cosmetic: `inspect eval` defaults to a rich TUI that
 hangs when stdout is not a terminal, with no error and no timeout.
 
-`--max-connections 5` is on every model here because that is what the run did — all 48
+`--max-connections 5` is on every model here because that is what the run did — all 54
 logs record it — and this block reproduces the run rather than improving on it. Only
 Google needs it (see [Pooling repeated passes](#pooling-repeated-passes)); a fresh run
-can leave the other three at the default 10 and go faster for it.
+can leave the other two at the default 10 and go faster for it.
 
 `-T rounds=3` is required, not decoration. The default is 1, so dropping it does not
 reproduce this run — it silently runs a one-round experiment and reports it against a
@@ -237,15 +237,13 @@ Everything else comes from the task defaults in `src/hup/task.py`: `token_limit`
 tokens per sample, `max_tokens` 3,000 tokens per response, `timeout` 120 seconds per
 request, `max_retries` 5 attempts and `time_limit` 600 seconds of wall clock per sample.
 Sampling is left at each provider's default, so passes differ, which is the point of
-running four. One caveat on `max_tokens`: the run itself used 2,000, raised afterwards
-as headroom for the extra escalation turns. Nothing truncated at either value, so the
-results reproduce at the current default — but the number above is today's setting, not
-a record of that run's.
+running six. All 54 logs record these five values, so the block reproduces the run's
+configuration and not only today's defaults.
 
 A scorer change can be applied to logs you already have, without paying for a run:
 
 ```bash
-python -m hup.rescore runs/full-2026-09-05/pass*/*.eval
+python -m hup.rescore runs/full-2026-09-07/pass*/*.eval
 ```
 
 This is how the markdown-emphasis fix reached the published table. It works because the
