@@ -298,7 +298,7 @@ that covers a narrower claim honestly. **Do not cut the question count to save m
 Cost is linear in questions x conditions x models x passes, but interval width depends
 on questions alone, so questions are the one lever that buys savings by directly
 weakening the eval's weakest property. The zero-event bound over 40 questions is 0.0881;
-over 20 it is 0.1391. Cut passes first, models second, questions never. **The selection
+over 20 it is 0.1684. Cut passes first, models second, questions never. **The selection
 rule is each provider's own everyday tier, not its flagship**, changed by the maintainer
 on 2026-09-03 from a flagship slate. The eval asks where ordinary users are most likely
 to walk away holding a false answer, and that is the model a person actually talks to
